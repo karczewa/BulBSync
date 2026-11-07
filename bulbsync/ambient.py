@@ -67,7 +67,9 @@ class _DxcamCapture:
     def __init__(self, monitor: int):
         import dxcam  # opcjonalne: python -m pip install dxcam
 
-        self.cam = dxcam.create(output_idx=max(0, monitor - 1), output_color="RGB")
+        # BGRA = surowy format DXGI. Przy RGB dxcam 0.3+ konwertuje przez OpenCV (cv2),
+        # którego zwykle nie ma; konwersję robimy sami na już zmniejszonym obrazie.
+        self.cam = dxcam.create(output_idx=max(0, monitor - 1), output_color="BGRA")
         if self.cam is None:
             raise RuntimeError("dxcam nie utworzył kamery")
         self.last = None
@@ -79,12 +81,17 @@ class _DxcamCapture:
             time.sleep(0.02)
         if frame is None:
             raise RuntimeError("dxcam nie zwrócił obrazu")
-        self.last = _downsample(frame).copy()
+        self.last = self._convert(frame)
+
+    @staticmethod
+    def _convert(frame: np.ndarray) -> np.ndarray:
+        small = _downsample(frame)
+        return np.ascontiguousarray(small[..., 2::-1])  # BGRA -> RGB (i kopia, bo dxcam używa bufora ponownie)
 
     def grab(self) -> np.ndarray:
         frame = self.cam.grab()
         if frame is not None:  # None = obraz się nie zmienił od ostatniej klatki
-            self.last = _downsample(frame).copy()
+            self.last = self._convert(frame)
         return self.last
 
     def close(self):
@@ -102,8 +109,11 @@ def open_capture(monitor: int):
     if sys.platform == "win32":
         try:
             return _DxcamCapture(monitor), None
-        except ImportError:
-            reason = "brak dxcam (python -m pip install dxcam)"
+        except ImportError as e:
+            if getattr(e, "name", None) == "dxcam":
+                reason = "brak dxcam (python -m pip install dxcam)"
+            else:
+                reason = f"dxcam potrzebuje modułu {getattr(e, 'name', None) or e}"
         except Exception as e:  # dxcam jest, ale nie działa na tym sprzęcie/monitorze
             reason = f"dxcam: {e}"[:120]
     return _MssCapture(monitor), reason
