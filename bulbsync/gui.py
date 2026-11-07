@@ -344,6 +344,8 @@ class AmbientPage(ctk.CTkFrame):
         label(left, "Ambient", 26, "bold").pack(anchor="w")
         self.status = label(left, "Zatrzymany", 13, color=theme.MUTED)
         self.status.pack(anchor="w")
+        self.substatus = label(left, "", 12, color=theme.MUTED)
+        self.substatus.pack(anchor="w")
         self.btn = ctk.CTkButton(head, text="▶  Start", width=150, height=44, corner_radius=12, font=font(15, "bold"),
                                  fg_color=theme.ACCENT, hover_color=theme.ACCENT_HOVER, command=app.toggle_ambient)
         self.btn.pack(side="right")
@@ -470,6 +472,7 @@ class AmbientPage(ctk.CTkFrame):
         else:
             self.btn.configure(text="▶  Start", state="normal", fg_color=theme.ACCENT, hover_color=theme.ACCENT_HOVER)
             self.status.configure(text="Zatrzymany", text_color=theme.MUTED)
+            self.substatus.configure(text="")
             for bid in self.rates:
                 self.rates[bid].configure(text="")
                 self.dots[bid].configure(fg_color=theme.OFF_DOT)
@@ -716,11 +719,14 @@ class App:
                 elif kind == "ambient_preview":
                     preview = ev[1]
                 elif kind == "ambient_backend":
-                    self.backend = ev[1]
+                    self.backend, reason = ev[1]
+                    self.ambient.substatus.configure(
+                        text=f"Szybsze przechwytywanie DXGI niedostępne: {reason}" if reason else "")
                 elif kind == "ambient_fps":
-                    fps, rates = ev[1]
+                    fps, rates, cap_ms = ev[1]
                     self.ambient.status.configure(
-                        text=f"Działa  ·  {fps:.0f} klatek/s  ·  przechwytywanie: {self.backend}",
+                        text=f"Działa  ·  analiza ekranu {fps:.0f}/s  ·  zrzut ekranu {cap_ms:.0f} ms "
+                             f"({self.backend})  ·  liczniki przy żarówkach = co do nich idzie",
                         text_color=theme.OK)
                     for bid, r in rates.items():
                         if bid in self.ambient.rates:

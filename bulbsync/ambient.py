@@ -97,12 +97,41 @@ class _DxcamCapture:
 
 
 def open_capture(monitor: int):
+    """Najszybsza dostępna metoda. Zwraca (capture, powód, dla którego DXGI nie działa, albo None)."""
+    reason = None
     if sys.platform == "win32":
         try:
-            return _DxcamCapture(monitor)
-        except Exception:
-            pass  # brak dxcam albo nie działa: zwykłe przechwytywanie
-    return _MssCapture(monitor)
+            return _DxcamCapture(monitor), None
+        except ImportError:
+            reason = "brak dxcam (python -m pip install dxcam)"
+        except Exception as e:  # dxcam jest, ale nie działa na tym sprzęcie/monitorze
+            reason = f"dxcam: {e}"[:120]
+    return _MssCapture(monitor), reason
+
+
+class _HighResTimer:
+    """Na Windowsie domyślny zegar ma krok ~15,6 ms, więc krótkie czekanie trwa za długo
+    i 60 kl/s zamienia się w ~40. timeBeginPeriod(1) zmniejsza krok do 1 ms na czas działania ambientu."""
+
+    def __enter__(self):
+        self.on = False
+        if sys.platform == "win32":
+            try:
+                import ctypes
+
+                self.on = ctypes.windll.winmm.timeBeginPeriod(1) == 0
+            except Exception:
+                pass
+        return self
+
+    def __exit__(self, *exc):
+        if self.on:
+            try:
+                import ctypes
+
+                ctypes.windll.winmm.timeEndPeriod(1)
+            except Exception:
+                pass
 
 
 class AmbientEngine(threading.Thread):
@@ -125,9 +154,10 @@ class AmbientEngine(threading.Thread):
     def run(self) -> None:
         cap = None
         try:
-            cap = open_capture(int(self.settings["ambient"].get("monitor", 1)))
-            self.events.put(("ambient_backend", cap.name))
-            self._loop(cap)
+            cap, reason = open_capture(int(self.settings["ambient"].get("monitor", 1)))
+            self.events.put(("ambient_backend", (cap.name, reason)))
+            with _HighResTimer():
+                self._loop(cap)
         except ImportError:
             self.events.put(("ambient_error", "Brak biblioteki mss: python -m pip install mss"))
         except Exception as e:
@@ -141,7 +171,8 @@ class AmbientEngine(threading.Thread):
 
     def _loop(self, cap) -> None:
         frames = 0
-        fps_t0 = last_t = time.monotonic()
+        fps_t0 = last_t = next_t = time.monotonic()
+        cap_ms = 0.0
         monitor = self.settings["ambient"].get("monitor", 1)
         sends0 = {bid: w.ambient_sends for bid, w, _ in self.assignments()}
         while not self._stopping.is_set():
@@ -151,9 +182,11 @@ class AmbientEngine(threading.Thread):
             if cfg.get("monitor", 1) != monitor:  # zmieniono monitor w trakcie
                 cap.close()
                 monitor = cfg.get("monitor", 1)
-                cap = open_capture(int(monitor))
-                self.events.put(("ambient_backend", cap.name))
+                cap, reason = open_capture(int(monitor))
+                self.events.put(("ambient_backend", (cap.name, reason)))
+            g0 = time.perf_counter()
             img = cap.grab()
+            cap_ms = cap_ms * 0.9 + (time.perf_counter() - g0) * 1000 * 0.1
             h, w = img.shape[:2]
             preview = {}
             for bulb_id, worker, zone in self.assignments():
@@ -178,10 +211,17 @@ class AmbientEngine(threading.Thread):
                 for bid, wk, _ in self.assignments():
                     rates[bid] = (wk.ambient_sends - sends0.get(bid, wk.ambient_sends)) / span
                     sends0[bid] = wk.ambient_sends
-                self.events.put(("ambient_fps", (frames / span, rates)))
+                self.events.put(("ambient_fps", (frames / span, rates, cap_ms)))
                 frames, fps_t0 = 0, now
             self.events.put(("ambient_preview", preview))
-            fps = min(MAX_FPS, max(1.0, float(cfg["fps"])))
-            delay = 1.0 / fps - (time.monotonic() - t0)
-            if delay > 0:
-                self._stopping.wait(delay)
+            # stałe tempo: kolejna klatka o wyznaczonym czasie, a nie "teraz + przerwa"
+            period = 1.0 / min(MAX_FPS, max(1.0, float(cfg["fps"])))
+            next_t += period
+            now = time.monotonic()
+            if next_t < now - period:  # nie nadążamy: nie próbuj nadrabiać zaległych klatek
+                next_t = now
+            while not self._stopping.is_set():
+                left = next_t - time.monotonic()
+                if left <= 0:
+                    break
+                time.sleep(min(left, 0.02))
