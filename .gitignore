@@ -1,0 +1,13 @@
+# Klucze żarówek i dane z tinytuya wizard - NIGDY nie wrzucać do repo
+devices.json
+snapshot.json
+tinytuya.json
+tuya-raw.json
+settings.json
+settings.json.tmp
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
