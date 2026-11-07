@@ -110,3 +110,46 @@ def test_white_rgb_and_wheel_colors():
     h = np.array([0.0, 1 / 3, 2 / 3])
     r, g, b = hsv_to_rgb_np(h, np.ones(3), np.ones(3))
     assert np.allclose(np.stack([r, g, b], 1), np.eye(3))
+
+
+def _bulb_pct(img, curve=2.2, method="vibrant"):
+    from bulbsync.color import zone_luminance
+
+    hsv = process_ambient(zone_color(img, method), min_brightness=1, max_brightness=100,
+                          luminance=zone_luminance(img), curve=curve)
+    return hsv[2] / 10
+
+
+def test_luminance_is_gamma_correct():
+    from bulbsync.color import zone_luminance
+
+    assert zone_luminance(np.zeros((4, 4, 3), np.uint8)) == 0
+    assert zone_luminance(np.full((4, 4, 3), 255, np.uint8)) == pytest.approx(1.0)
+    # szarość 50% na ekranie to tylko ~21% światła
+    assert zone_luminance(np.full((4, 4, 3), 128, np.uint8)) == pytest.approx(0.216, abs=0.005)
+    # pełny kolor = pełna intensywność, niezależnie od barwy
+    assert zone_luminance(np.full((1, 1, 3), (0, 0, 255), np.uint8)) == pytest.approx(1.0)
+    assert zone_luminance(np.full((1, 1, 3), (255, 0, 0), np.uint8)) == pytest.approx(1.0)
+
+
+def test_dark_scenes_dim_the_bulb():
+    dark_grey = np.full((20, 20, 3), 50, np.uint8)  # ciemna scena, np. noc w grze
+    assert _bulb_pct(dark_grey) < 6  # wcześniej ok. 20%
+    dark_blue = np.zeros((20, 20, 3), np.uint8)
+    dark_blue[..., 2] = 60
+    assert _bulb_pct(dark_blue) < 6  # wcześniej ok. 25%
+    blue = np.zeros((20, 20, 3), np.uint8)
+    blue[..., 2] = 255
+    assert _bulb_pct(blue) == 100  # pełny niebieski = pełna moc
+    neon = np.zeros((20, 20, 3), np.uint8)
+    neon[:2, :] = (255, 0, 200)  # 10% neonu na czerni
+    h, s, _ = rgb_to_tuya_hsv(*zone_color(neon, "vibrant"))
+    assert s > 950  # kolor nadal wyrazisty...
+    assert _bulb_pct(neon) < 16  # ...ale żarówka przygaszona (wcześniej ok. 20%)
+    assert _bulb_pct(np.full((20, 20, 3), 255, np.uint8)) == 100
+
+
+def test_brightness_curve_is_monotonic():
+    img = np.full((10, 10, 3), 90, np.uint8)
+    p1, p22, p3 = (_bulb_pct(img, c) for c in (1.0, 2.2, 3.0))
+    assert p1 > p22 > p3

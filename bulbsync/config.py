@@ -30,6 +30,7 @@ DEFAULT_SETTINGS = {
         "monitor": 1,
         "method": "vibrant",
         "saturation": 1.5,
+        "brightness_curve": 2.2,
         "smoothing": 0.5,
         "min_brightness": 5,
         "max_brightness": 100,

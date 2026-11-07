@@ -116,12 +116,27 @@ def zone_color(pixels: np.ndarray, method: str = "vibrant") -> tuple[float, floa
     val = mx / 255.0
     w = (sat * val) ** 2 + 0.02
     m = (px * w[:, None]).sum(axis=0) / w.sum()
-    # Ważenie przesuwa jasność w górę; przywracamy jasność zgodną ze średnią sceny.
-    scene_v = float(val.mean())
-    m_v = float(m.max()) / 255.0
-    if m_v > 1e-6:
-        m = m * min(1.0, scene_v / m_v * 1.5)
+    # Tu liczy się tylko odcień i nasycenie; jasność daje osobno zone_luminance().
     return float(m[0]), float(m[1]), float(m[2])
+
+
+# Wartości pikseli są zapisane z gammą sRGB: piksel 20% świeci ok. 3% mocy.
+# Tablica zamienia 0-255 na rzeczywistą ilość światła (0-1).
+_c = np.arange(256, dtype=np.float64) / 255.0
+SRGB_TO_LINEAR = np.where(_c <= 0.04045, _c / 12.92, ((_c + 0.055) / 1.055) ** 2.4).astype(np.float32)
+
+
+def zone_luminance(pixels: np.ndarray) -> float:
+    """Średnia intensywność światła w strefie (0-1), z uwzględnieniem gammy.
+
+    Dla każdego piksela bierzemy jego najmocniejszy kanał po zamianie na rzeczywistą ilość światła.
+    Dzięki temu pełny niebieski = pełna moc (żarówka i tak świeci tym samym kolorem, a oko
+    odbiera jej niebieski równie słabo jak ekranu), a ciemny niebieski = mała moc.
+    """
+    if pixels.size == 0:
+        return 0.0
+    lin = SRGB_TO_LINEAR[pixels.reshape(-1, 3)]
+    return float(lin.max(axis=1).mean())
 
 
 # --- Przetwarzanie ambient ---------------------------------------------------------
@@ -153,28 +168,45 @@ class Smoother:
         self.value = None
 
 
+def brightness_level(luminance: float, curve: float = 2.2) -> float:
+    """Ilość światła ze strefy (0-1) -> poziom jasności żarówki (0-1).
+
+    Najpierw wracamy do skali „jak widzi oko” (gamma 2.2), potem krzywa użytkownika:
+    curve 2.2 = żarówka świeci proporcjonalnie do ilości światła z ekranu,
+    mniej = jaśniej w ciemnych scenach (1.0 ≈ dawne zachowanie), więcej = ciemne sceny jeszcze ciemniej.
+    """
+    perceived = _clamp(luminance, 0.0, 1.0) ** (1 / 2.2)
+    return perceived ** _clamp(curve, 0.5, 5.0)
+
+
 def process_ambient(
     rgb,
     saturation: float = 1.5,
     min_brightness: float = 5.0,
     max_brightness: float = 100.0,
     black_threshold: float = 4.0,
+    luminance: float | None = None,
+    curve: float = 2.2,
 ) -> tuple[int, int, int]:
     """Kolor z ekranu -> (H, S, V) Tuya, z podbiciem nasycenia i mapowaniem jasności.
 
-    Jasności w procentach. Ekran ciemniejszy niż `black_threshold` % daje jasność minimalną.
+    Odcień i nasycenie z `rgb`. Jasność z `luminance` (rzeczywista ilość światła 0-1,
+    z zone_luminance); bez niej liczona z samego koloru. Jasności w procentach.
+    Ekran ciemniejszy (w odczuciu oka) niż `black_threshold` % daje jasność minimalną.
     """
     r, g, b = (_clamp(c, 0, 255) / 255.0 for c in rgb)
     h, s, v = colorsys.rgb_to_hsv(r, g, b)
     s = _clamp(s * saturation, 0.0, 1.0)
+    if luminance is None:
+        luminance = float(SRGB_TO_LINEAR[np.clip(np.round(np.array(rgb)), 0, 255).astype(int)].max())
     lo = _clamp(min_brightness, 1, 100) / 100.0
     hi = _clamp(max_brightness, 1, 100) / 100.0
     if hi < lo:
         lo, hi = hi, lo
-    if v * 100 < black_threshold:
+    if _clamp(luminance, 0.0, 1.0) ** (1 / 2.2) * 100 < black_threshold:
         out_v = lo
     else:
-        out_v = lo + (hi - lo) * v
+        out_v = lo + (hi - lo) * brightness_level(luminance, curve)
     return (
         int(round(h * 360)) % 360,
         int(round(s * 1000)),

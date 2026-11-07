@@ -43,6 +43,10 @@ python -m bulbsync
   W przeciwnym razie używa `mss`. Która metoda działa, widać w linii statusu ambientu.
 - **Wygładzanie:** ok. 50% daje spokojne, płynne przejścia. 0% reaguje najszybciej, ale migocze przy dynamicznych scenach.
   Wygładzanie jest liczone w czasie, więc działa tak samo przy 10 i przy 60 klatkach/s.
+- **Krzywa jasności:** jasność żarówki liczona jest z faktycznej ilości światła w strefie (z korekcją gammy ekranu),
+  osobno od koloru. Przy 2.2 (domyślnie) żarówka świeci proporcjonalnie do światła z ekranu, więc ciemne sceny są
+  naprawdę ciemne. Jeśli całość wydaje się za ciemna, zejdź do 1.6–1.8. 1.0 to jasne zachowanie starszej wersji.
+  Procent przy każdej żarówce pokazuje jej bieżącą jasność.
 - **Sposób liczenia koloru:** „Wyraziste kolory” daje pierwszeństwo nasyconym pikselom, więc czarne/szare tło nie zagłusza
   np. ognia czy neonu. „Średnia z ekranu” jest wierniejsza, ale bledsza.
 - **Gry pełnoekranowe:** tryb „exclusive fullscreen” może blokować przechwytywanie. Ustaw w grze **okno bez ramek (borderless)**.

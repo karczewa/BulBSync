@@ -9,7 +9,7 @@ import time
 
 import numpy as np
 
-from .color import Smoother, process_ambient, zone_color, zone_rect
+from .color import Smoother, process_ambient, zone_color, zone_luminance, zone_rect
 
 SAMPLE_WIDTH = 192  # ekran zmniejszamy do takiej szerokości przed liczeniem kolorów
 MAX_FPS = 60
@@ -201,15 +201,19 @@ class AmbientEngine(threading.Thread):
             preview = {}
             for bulb_id, worker, zone in self.assignments():
                 x0, y0, x1, y1 = zone_rect(w, h, zone, cfg["edge_depth"] / 100.0)
-                rgb = zone_color(img[y0:y1, x0:x1], cfg["method"])
+                region = img[y0:y1, x0:x1]
+                rgb = zone_color(region, cfg["method"])
+                lum = zone_luminance(region)
                 sm = self._smoothers.setdefault(bulb_id, Smoother())
-                rgb = sm.update(rgb, cfg["smoothing"], dt)
+                *rgb, lum = sm.update((*rgb, lum), cfg["smoothing"], dt)
                 hsv = process_ambient(
                     rgb,
                     saturation=cfg["saturation"],
                     min_brightness=cfg["min_brightness"],
                     max_brightness=cfg["max_brightness"],
                     black_threshold=cfg["black_threshold"],
+                    luminance=lum,
+                    curve=cfg.get("brightness_curve", 2.2),
                 )
                 worker.set_ambient(hsv, bool(cfg["gradient"]))
                 preview[bulb_id] = hsv

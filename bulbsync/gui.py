@@ -361,6 +361,7 @@ class AmbientPage(ctk.CTkFrame):
         rows.grid_columnconfigure(1, weight=1)
         self.dots: dict[str, ctk.CTkFrame] = {}
         self.rates: dict[str, ctk.CTkLabel] = {}
+        self.brights: dict[str, ctk.CTkLabel] = {}
         self.checks: dict[str, ctk.BooleanVar] = {}
         self.zone_menus: dict[str, ctk.CTkOptionMenu] = {}
         for i, b in enumerate(app.bulbs):
@@ -379,9 +380,12 @@ class AmbientPage(ctk.CTkFrame):
                                      command=lambda v, b=b: app.zone_changed(b.id, v))
             menu.set(ZONES.get(per["zone"], ZONE_NAMES[0]))
             menu.grid(row=i, column=2, padx=10)
-            rate = label(rows, "", 12, color=theme.MUTED, width=56, anchor="e")
-            rate.grid(row=i, column=3)
+            bright = label(rows, "", 12, "bold", width=44, anchor="e")
+            bright.grid(row=i, column=3)
+            rate = label(rows, "", 12, color=theme.MUTED, width=50, anchor="e")
+            rate.grid(row=i, column=4)
             self.dots[b.id], self.rates[b.id], self.checks[b.id], self.zone_menus[b.id] = dot, rate, var, menu
+            self.brights[b.id] = bright
 
         # --- ustawienia
         sc = ctk.CTkScrollableFrame(self, fg_color=theme.SURFACE, corner_radius=16,
@@ -422,6 +426,9 @@ class AmbientPage(ctk.CTkFrame):
                "Więcej = spokojniej, mniej = szybsza reakcja na błyski.", factor=100.0, is_int=False)
         slider("Nasycenie", "saturation", 1.0, 3.0, 20, lambda v: f"×{v:.1f}",
                "Podbija blade kolory z ekranu.", is_int=False)
+        slider("Krzywa jasności", "brightness_curve", 1.0, 4.0, 30, lambda v: f"{v:.1f}",
+               "Wyżej = ciemne sceny ciemniej. 2.2 = żarówka świeci proporcjonalnie do ilości światła "
+               "z ekranu. 1.0 = jaśniej, jak w starszej wersji.", is_int=False)
         slider("Jasność minimalna", "min_brightness", 1, 100, 99, lambda v: f"{v:.0f}%", "Przy ciemnych scenach.")
         slider("Jasność maksymalna", "max_brightness", 1, 100, 99, lambda v: f"{v:.0f}%", "Przy jasnych scenach.")
         slider("Próg czerni", "black_threshold", 0, 30, 30, lambda v: f"{v:.0f}%",
@@ -475,6 +482,7 @@ class AmbientPage(ctk.CTkFrame):
             self.substatus.configure(text="")
             for bid in self.rates:
                 self.rates[bid].configure(text="")
+                self.brights[bid].configure(text="")
                 self.dots[bid].configure(fg_color=theme.OFF_DOT)
 
 
@@ -743,8 +751,11 @@ class App:
         except queue.Empty:
             pass
         if preview and self.engine:
-            for bid, hsv in preview.items():
-                hx = hex_of(tuya_hsv_to_rgb(*hsv))
+            for bid, (h, s, v) in preview.items():
+                # podgląd tak, jak oko widzi żarówkę: jasność żarówki jest liniowa, ekran ma gammę
+                hx = hex_of(tuya_hsv_to_rgb(h, s, int(1000 * (v / 1000) ** (1 / 2.2))))
+                if bid in self.ambient.brights:
+                    self.ambient.brights[bid].configure(text=f"{v / 10:.0f}%")
                 if self.ambient_colors.get(bid) != hx:
                     self.ambient_colors[bid] = hx
                     self.ambient.dots[bid].configure(fg_color=hx)
