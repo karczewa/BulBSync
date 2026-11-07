@@ -127,18 +127,25 @@ def zone_color(pixels: np.ndarray, method: str = "vibrant") -> tuple[float, floa
 # --- Przetwarzanie ambient ---------------------------------------------------------
 
 
+SMOOTHING_REFERENCE_DT = 0.1  # suwak wygładzania jest skalibrowany dla 10 klatek/s
+
+
 class Smoother:
-    """Wygładzanie wykładnicze, żeby światło nie migało przy każdej zmianie klatki."""
+    """Wygładzanie wykładnicze, żeby światło nie migało przy każdej zmianie klatki.
+
+    Liczone względem czasu, a nie klatek, więc to samo ustawienie daje tę samą
+    płynność przy 10 i przy 60 klatkach/s (przy 60 po prostu z drobniejszymi krokami).
+    """
 
     def __init__(self):
         self.value: np.ndarray | None = None
 
-    def update(self, rgb, factor: float) -> tuple[float, float, float]:
+    def update(self, rgb, factor: float, dt: float = SMOOTHING_REFERENCE_DT) -> tuple[float, float, float]:
         new = np.asarray(rgb, dtype=np.float32)
         if self.value is None or factor <= 0:
             self.value = new
         else:
-            f = _clamp(factor, 0.0, 0.98)
+            f = _clamp(factor, 0.0, 0.98) ** (max(dt, 0.0) / SMOOTHING_REFERENCE_DT)
             self.value = self.value * f + new * (1.0 - f)
         return tuple(float(x) for x in self.value)
 

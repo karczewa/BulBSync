@@ -87,3 +87,26 @@ def test_hsv_close():
     assert hsv_close((359, 500, 500), (1, 505, 495))
     assert not hsv_close((0, 500, 500), (20, 500, 500))
     assert not hsv_close(None, (0, 0, 0))
+
+
+def test_smoother_is_time_based():
+    """To samo ustawienie po 1 s daje ten sam efekt przy 10 i 60 klatkach/s."""
+    results = []
+    for fps in (10, 60):
+        sm = Smoother()
+        sm.update((0, 0, 0), 0.5, 1 / fps)
+        for _ in range(fps):
+            out = sm.update((255, 0, 0), 0.5, 1 / fps)
+        results.append(out[0])
+    assert results[0] == pytest.approx(results[1], abs=0.5)
+    assert 250 < results[0] < 255
+
+
+def test_white_rgb_and_wheel_colors():
+    from bulbsync.theme import COLD_WHITE, WARM_WHITE, white_rgb
+    from bulbsync.widgets import hsv_to_rgb_np
+
+    assert white_rgb(0) == WARM_WHITE and white_rgb(1000) == COLD_WHITE
+    h = np.array([0.0, 1 / 3, 2 / 3])
+    r, g, b = hsv_to_rgb_np(h, np.ones(3), np.ones(3))
+    assert np.allclose(np.stack([r, g, b], 1), np.eye(3))

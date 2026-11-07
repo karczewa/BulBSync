@@ -36,6 +36,8 @@ class BulbWorker(threading.Thread):
         self._ambient_started = False
         self._last_ambient_sent = None
         self._last_ambient_time = 0.0
+        self._last_mode_time = 0.0
+        self.ambient_sends = 0  # licznik do wyświetlania "wysłane/s"
         self._ip_changed = False
         self._dev = None
         self.online = None
@@ -185,7 +187,11 @@ class BulbWorker(threading.Thread):
             and now - self._last_ambient_time < AMBIENT_KEEPALIVE_SECONDS
         ):
             return
-        dps = {"21": "music", "27": music_data(h, s, v, gradient)}
+        dps = {"27": music_data(h, s, v, gradient)}
+        if start or now - self._last_mode_time >= AMBIENT_KEEPALIVE_SECONDS:
+            # tryb "music" wystarczy przypominać co jakiś czas, a nie w każdej klatce
+            dps["21"] = "music"
+            self._last_mode_time = now
         if start:
             dps["20"] = True
             # pierwsze wysłanie z potwierdzeniem, żeby wykryć brak połączenia
@@ -196,6 +202,35 @@ class BulbWorker(threading.Thread):
             if self.online is not True:
                 self._emit(True)
         else:
+            self._drain(dev)
             dev.set_multiple_values(dps, nowait=True)
+        self.ambient_sends += 1
         self._last_ambient_sent = hsv
         self._last_ambient_time = now
+
+    @staticmethod
+    def _drain(dev) -> None:
+        """Odczytaj zaległe odpowiedzi żarówki bez czekania.
+
+        Przy wysyłaniu bez czekania (nowait) żarówka i tak odpowiada na każdą wiadomość.
+        Nieodczytane odpowiedzi zapychają bufor połączenia, a wtedy żarówka zaczyna się
+        zacinać albo przestaje odpowiadać.
+        """
+        sock = getattr(dev, "socket", None)
+        if sock is None:
+            return
+        timeout = sock.gettimeout()
+        try:
+            sock.setblocking(False)
+            for _ in range(64):
+                if not sock.recv(65536):
+                    break
+        except (BlockingIOError, InterruptedError):
+            pass
+        except OSError:
+            pass  # zerwane połączenie wyjdzie przy następnym wysłaniu i zostanie odnowione
+        finally:
+            try:
+                sock.settimeout(timeout)
+            except OSError:
+                pass

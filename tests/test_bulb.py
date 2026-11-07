@@ -121,3 +121,24 @@ def test_ambient_sends_music_dp_latest_only(worker):
     n = len(amb)
     time.sleep(0.3)
     assert len([c for c in dev.calls if c[0] == "set" and "27" in c[1]]) == n
+
+
+def test_drain_reads_pending_replies_without_blocking():
+    import socket
+
+    a, b = socket.socketpair()
+    a.settimeout(2.0)
+    b.sendall(b"x" * 200_000)  # zaległe odpowiedzi żarówki
+
+    class Dev:
+        socket = a
+
+    t0 = time.monotonic()
+    bulb_mod.BulbWorker._drain(Dev)
+    assert time.monotonic() - t0 < 0.5
+    assert a.gettimeout() == 2.0  # przywrócony timeout
+    a.setblocking(False)
+    with pytest.raises(BlockingIOError):
+        a.recv(1)  # wszystko przeczytane
+    a.close()
+    b.close()
