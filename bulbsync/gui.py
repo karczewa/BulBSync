@@ -14,6 +14,7 @@ import customtkinter as ctk
 from . import __version__, theme
 from .ambient import MAX_FPS, AmbientEngine, list_monitors
 from .bulb import BulbWorker
+from .knob import KnobController, KnobLink
 from .color import ZONES, colour_data_v2, parse_colour_data_v2, rgb_to_tuya_hsv, tuya_hsv_to_rgb
 from .config import DEVICES_PATH, bulb_settings, load_devices, load_settings, save_settings
 from .theme import hex_of, white_rgb
@@ -394,6 +395,8 @@ class AmbientPage(ctk.CTkFrame):
         sc.grid(row=1, column=1, sticky="nsew")
         label(sc, "Ustawienia", 16, "bold").pack(anchor="w", padx=12, pady=(10, 4))
 
+        self.sliders: dict[str, tuple] = {}
+
         def slider(text, key, lo, hi, steps, fmt, hint, factor=1.0, is_int=True):
             box = ctk.CTkFrame(sc, fg_color="transparent")
             box.pack(fill="x", padx=12, pady=(10, 0))
@@ -417,6 +420,7 @@ class AmbientPage(ctk.CTkFrame):
             s.set(cfg[key] * factor)
             s.pack(fill="x", pady=(4, 0))
             val.configure(text=fmt(cfg[key] * factor))
+            self.sliders[key] = (s, val, fmt, factor)
             label(box, hint, 11, color=theme.MUTED, anchor="w", justify="left", wraplength=int(300 * scale)).pack(
                 fill="x")
 
@@ -471,6 +475,14 @@ class AmbientPage(ctk.CTkFrame):
                   "przechwytywanie.", 11, color=theme.MUTED, justify="left", wraplength=int(300 * scale),
               anchor="w").pack(fill="x", padx=12, pady=(16, 10))
 
+    def show_setting(self, key: str):
+        """Odśwież suwak po zmianie ustawienia spoza okna (np. pokrętłem)."""
+        if key in self.sliders:
+            s, val, fmt, factor = self.sliders[key]
+            v = self.app.settings["ambient"][key] * factor
+            s.set(v)
+            val.configure(text=fmt(v))
+
     def set_running(self, running: bool, stopping: bool = False):
         if stopping:
             self.btn.configure(text="Zatrzymywanie…", state="disabled")
@@ -522,6 +534,11 @@ class App:
         self.workers = {b.id: BulbWorker(b, self.events) for b in self.bulbs}
         for w in self.workers.values():
             w.start()
+        self.knob_ctl = KnobController()
+        self._knob_last_turn = 0.0
+        self._knob_msg_job = None
+        self.knob_link = KnobLink(self.events, self.settings["knob"].get("port", ""))
+        self.knob_link.start()
 
         root.grid_columnconfigure(1, weight=1)
         root.grid_rowconfigure(0, weight=1)
@@ -564,6 +581,28 @@ class App:
 
         bottom = ctk.CTkFrame(sb, fg_color="transparent")
         bottom.pack(side="bottom", fill="x", padx=12, pady=18)
+
+        kc = ctk.CTkFrame(bottom, fg_color=theme.SURFACE, corner_radius=12)
+        kc.pack(fill="x", pady=(0, 12))
+        krow = ctk.CTkFrame(kc, fg_color="transparent")
+        krow.pack(fill="x", padx=12, pady=(10, 0))
+        self.knob_dot = ctk.CTkFrame(krow, width=10, height=10, corner_radius=5, fg_color=theme.OFF_DOT)
+        self.knob_dot.pack(side="left")
+        label(krow, "Pokrętło", 13, "bold").pack(side="left", padx=8)
+        self._knob_idle_text = "szukam…"
+        self.knob_lbl = label(kc, self._knob_idle_text, 11, color=theme.MUTED, anchor="w", justify="left",
+                              wraplength=170)
+        self.knob_lbl.pack(fill="x", padx=12, pady=(2, 0))
+        self._knob_names = {"Wszystkie": ALL, **{b.name: b.id for b in self.bulbs}}
+        current = next((n for n, i in self._knob_names.items() if i == self.settings["knob"].get("target")),
+                       "Wszystkie")
+        self.knob_menu = ctk.CTkOptionMenu(
+            kc, values=list(self._knob_names), height=28, font=font(12), dropdown_font=font(12),
+            fg_color=theme.SURFACE_2, button_color=theme.SURFACE_3, button_hover_color=theme.ACCENT,
+            dropdown_fg_color=theme.SURFACE_2, dropdown_hover_color=theme.SURFACE_3, text_color=theme.TEXT,
+            command=self._knob_target_changed)
+        self.knob_menu.set(current)
+        self.knob_menu.pack(fill="x", padx=12, pady=(6, 12))
         style = dict(height=34, corner_radius=10, font=font(13), fg_color=theme.SURFACE_2,
                      hover_color=theme.SURFACE_3, text_color=theme.TEXT)
         ctk.CTkButton(bottom, text="Odśwież stan", command=self.refresh_all, **style).pack(fill="x", pady=3)
@@ -578,12 +617,14 @@ class App:
                         text_color=theme.TEXT if k == key else theme.MUTED)
 
     # --- polecenia
-    def send(self, bulb_ids, dps, force: bool = False) -> bool:
+    def send(self, bulb_ids, dps, force: bool = False, from_knob: bool = False) -> bool:
         """Wysyła tylko to, co różni się od znanego stanu żarówki. Zwraca True, jeśli coś poszło."""
         sent = False
         for bid in bulb_ids:
             if bid in self.in_ambient:
                 continue  # ambient ma pierwszeństwo
+            if not from_knob:
+                self.knob_ctl.forget(bid)  # pokrętło ma liczyć od nowego stanu
             w = self.workers[bid]
             todo = dps if force else {k: v for k, v in dps.items() if w.dps.get(k) != v}
             if todo:
@@ -598,6 +639,84 @@ class App:
             for bid in ids:
                 t = self.control.tiles[bid].power
                 t.select() if on else t.deselect()
+
+    # --- pokrętło USB
+    def _knob_target_changed(self, name):
+        self.settings["knob"]["target"] = self._knob_names.get(name, ALL)
+        self.schedule_save()
+
+    def _knob_targets(self) -> list[str]:
+        t = self.settings["knob"].get("target", ALL)
+        return [t] if t in self.workers else [b.id for b in self.bulbs]
+
+    def _knob_status(self, port):
+        if port == "brak pyserial":
+            self._knob_idle_text, col = "brak biblioteki pyserial – uruchom install.bat", theme.ERR
+        elif port:
+            self._knob_idle_text, col = f"podłączone ({port})", theme.OK
+        else:
+            self._knob_idle_text, col = "niepodłączone", theme.OFF_DOT
+        self.knob_dot.configure(fg_color=col)
+        self.knob_lbl.configure(text=self._knob_idle_text, text_color=theme.MUTED)
+
+    def _knob_flash(self, text):
+        """Pokaż na chwilę, co zrobiło pokrętło."""
+        self.knob_lbl.configure(text=text, text_color=theme.TEXT)
+        if self._knob_msg_job:
+            self.root.after_cancel(self._knob_msg_job)
+        self._knob_msg_job = self.root.after(
+            2000, lambda: self.knob_lbl.configure(text=self._knob_idle_text, text_color=theme.MUTED))
+
+    def _knob_event(self, ev):
+        bids = self._knob_targets()
+        free = {bid: self.workers[bid].dps for bid in bids if bid not in self.in_ambient}
+        kind = ev[0]
+        if kind == "rotate":
+            _, d, pressed = ev
+            now = time.monotonic()
+            fast = now - self._knob_last_turn < 0.05  # szybkie kręcenie = większe kroki
+            self._knob_last_turn = now
+            step = float(self.settings["knob"].get("step", 5)) * (2 if fast else 1)
+            if self.engine and len(free) < len(bids):
+                # w trakcie ambientu pokrętło reguluje jego jasność max (z wciśnięciem: min)
+                cfg = self.settings["ambient"]
+                if pressed:
+                    key = "min_brightness"
+                    cfg[key] = int(max(1, min(cfg["max_brightness"], cfg[key] + d * step)))
+                    text = f"Ambient: jasność min {cfg[key]}%"
+                else:
+                    key = "max_brightness"
+                    cfg[key] = int(max(cfg["min_brightness"], min(100, cfg[key] + d * step)))
+                    text = f"Ambient: jasność max {cfg[key]}%"
+                self.ambient.show_setting(key)
+                self.schedule_save()
+                self._knob_flash(text)
+                return
+            if pressed:
+                out, text = self.knob_ctl.shift(free, d)
+            else:
+                out, avg = self.knob_ctl.rotate(free, d, step)
+                text = f"Jasność {avg}%" if avg is not None else None
+            for bid, dps in out.items():
+                self.send([bid], dps, from_knob=True)
+            if text:
+                self._knob_flash(text)
+        elif kind == "click":
+            if self.engine:
+                self.toggle_ambient()
+                self._knob_flash("Ambient zatrzymany")
+                return
+            out, on = self.knob_ctl.toggle(free)
+            for bid, dps in out.items():
+                self.send([bid], dps, force=True, from_knob=True)
+            self._knob_flash("Włączone" if on else "Wyłączone")
+        elif kind == "hold":
+            was_running = self.engine is not None
+            self.toggle_ambient()
+            if was_running:
+                self._knob_flash("Ambient zatrzymany")
+            elif self.engine:
+                self._knob_flash("Ambient uruchomiony")
 
     def refresh_all(self):
         for w in self.workers.values():
@@ -748,6 +867,10 @@ class App:
                 elif kind == "scan_error":
                     self.scan_btn.configure(state="normal", text="Skanuj sieć")
                     messagebox.showerror("Skanowanie", ev[1])
+                elif kind == "knob_status":
+                    self._knob_status(ev[1])
+                elif kind == "knob":
+                    self._knob_event(ev[1])
         except queue.Empty:
             pass
         if preview and self.engine:
@@ -785,6 +908,7 @@ class App:
             time.sleep(0.5)  # daj wątkom chwilę na wysłanie przywrócenia
         self.settings["window"]["geometry"] = self.root.geometry()
         self._save_now()
+        self.knob_link.stop()
         for w in self.workers.values():
             w.shutdown()
         self.root.destroy()

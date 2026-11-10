@@ -15,7 +15,7 @@ Do tego **tryb ambient**: żarówki przejmują kolory z ekranu, np. podczas gry.
 ## Instalacja (Windows)
 
 1. Pobierz repo: **Code → Download ZIP** i rozpakuj (albo `git clone`).
-2. Uruchom **`install.bat`**. Zainstaluje `tinytuya`, `mss`, `numpy`, `customtkinter` i `pillow`,
+2. Uruchom **`install.bat`**. Zainstaluje `tinytuya`, `mss`, `numpy`, `customtkinter`, `pillow` i `pyserial`,
    a opcjonalnie `dxcam`, czyli szybsze przechwytywanie ekranu na Windowsie.
 3. Skopiuj **`devices.json`** (ten z `python -m tinytuya wizard`) do folderu BulBSync, obok `start.bat`.
 4. Uruchom **`start.bat`**.
@@ -52,6 +52,68 @@ python -m bulbsync
 - **Gry pełnoekranowe:** tryb „exclusive fullscreen” może blokować przechwytywanie. Ustaw w grze **okno bez ramek (borderless)**.
 - W trybie ambient żarówki używają kanału DP 27 (tego samego co synchronizacja z muzyką w aplikacji), który przyjmuje szybkie zmiany.
 
+## Pokrętło USB (opcjonalne)
+
+Fizyczne pokrętło: kręcenie zmienia jasność, kliknięcie włącza i wyłącza światło.
+Części: **Raspberry Pi Pico H**, moduł enkodera **KY-040**, 5 przewodów żeńsko-żeńskich, kabel micro-USB **z transmisją danych**.
+
+### Podłączenie
+
+| KY-040 | Pico H: pin (fizyczny numer) | Podpis na spodzie Pico |
+|---|---|---|
+| `CLK` | pin **4** | GP2 |
+| `DT` | pin **5** | GP3 |
+| `SW` | pin **6** | GP4 |
+| `GND` | pin **3** | GND |
+| `+` | pin **36** | 3V3(OUT) |
+
+```
+            USB
+      ┌─────┴─────┐
+ GP0  1 ●         ● 40  VBUS
+ GP1  2 ●         ● 39  VSYS
+ GND  3 ■  ← GND  ■ 38  GND
+ GP2  4 ●  ← CLK  ● 37  3V3_EN   ✗ NIE TEN
+ GP3  5 ●  ← DT   ● 36  3V3(OUT) ← +
+ GP4  6 ●  ← SW   ● 35  ...
+      ...   (widok od góry, USB u góry)
+```
+
+- Piny liczone od **lewego górnego rogu przy USB** (1, 2, 3… w dół lewej strony; prawa strona od 40 u góry w dół).
+- `+` podłącz do **3V3(OUT), pin 36**. Nie do pinu 37 (3V3_EN, wyłącza zasilanie) i nie do 5 V (VBUS/VSYS).
+- Piny Pico H wystają od spodu. Na spodzie płytki przy każdym pinie jest podpis (GP2, GND, 3V3), więc łatwo sprawdzić.
+- Jeśli kręcenie w prawo zmniejsza jasność, zamień przewody `CLK` i `DT`.
+
+### Wgranie programu na Pico (jednorazowo)
+
+1. Zainstaluj **Arduino IDE 2**.
+2. *File → Preferences → Additional boards manager URLs* wklej:
+   `https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json`
+3. *Tools → Board → Boards Manager*, wyszukaj **pico**, zainstaluj **Raspberry Pi Pico/RP2040/RP2350** (autor: Earle F. Philhower).
+4. Otwórz `firmware/bulbsync_knob/bulbsync_knob.ino`.
+5. *Tools → Board → Raspberry Pi Pico/RP2040/RP2350 → Raspberry Pi Pico*.
+6. **Za pierwszym razem:** przytrzymaj przycisk **BOOTSEL** na Pico, podłącz kabel USB, puść przycisk. Potem kliknij **Upload** (strzałka).
+   Kolejne wgrania działają już bez BOOTSEL.
+7. Test: *Tools → Serial Monitor*, prędkość **115200**. Co sekundę powinno pojawiać się `BULBSYNC-KNOB 1`,
+   a przy kręceniu i klikaniu `+`, `-`, `CLICK`. Dioda na Pico mignie przy każdym ruchu.
+   **Zamknij Serial Monitor** przed uruchomieniem BulBSync, bo port może być otwarty tylko w jednym programie naraz.
+
+### Obsługa
+
+| Ruch | Normalnie | W trakcie ambientu |
+|---|---|---|
+| Obrót | jasność ±5% na ząbek (szybkie kręcenie: ±10%); kręcenie w górę włącza wyłączone światło | jasność maksymalna ambientu |
+| Obrót z wciśniętą gałką | kolor: odcień, biały: barwa (ciepła ↔ zimna) | jasność minimalna ambientu |
+| Kliknięcie | włącz / wyłącz | zatrzymaj ambient |
+| Przytrzymanie (0,7 s) | start ambientu | zatrzymaj ambient |
+
+Aplikacja sama znajduje pokrętło (port Raspberry Pi, który się przedstawi) i łączy się ponownie po odłączeniu kabla.
+Status i ostatnią akcję widać na pasku bocznym. Tam też wybierasz, czym steruje pokrętło: wszystkimi żarówkami albo jedną.
+Gdyby automatyczne wykrywanie zawiodło, wpisz port w `settings.json`: `"knob": {"port": "COM5"}`.
+
+Jeśli jeden ząbek zmienia jasność dwa razy (albo trzeba kręcić o dwa ząbki), zmień w programie płytki
+`TRANSITIONS_PER_DETENT` z 4 na 2 i wgraj ponownie.
+
 ## Gdy coś nie działa
 
 | Objaw | Co zrobić |
@@ -78,3 +140,5 @@ python -m pytest
 | `bulbsync/ambient.py` | przechwytywanie ekranu i liczenie koloru dla stref |
 | `bulbsync/color.py` | konwersje kolorów i formaty danych Tuya (DP 24 / DP 27) |
 | `bulbsync/config.py` | wczytywanie `devices.json` i `settings.json` |
+| `bulbsync/knob.py` | pokrętło USB: wyszukiwanie i połączenie z płytką, co robi obrót i kliknięcie |
+| `firmware/bulbsync_knob/` | program na Raspberry Pi Pico (Arduino) |

@@ -38,6 +38,11 @@ DEFAULT_SETTINGS = {
         "edge_depth": 25,
         "gradient": False,
     },
+    "knob": {
+        "target": "__all__",  # czym steruje pokrętło: "__all__" albo id żarówki
+        "step": 5,  # zmiana jasności na jeden ząbek, w %
+        "port": "",  # puste = wyszukaj automatycznie (np. "COM5", gdy wykrywanie zawiedzie)
+    },
     "window": {"geometry": ""},
 }
 
