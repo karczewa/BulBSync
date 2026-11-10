@@ -52,29 +52,28 @@ Plik sam sprawdza, czy po zmianach wszystko się mieści, i wypisuje komunikat w
 
 ## Potrzebne drobiazgi
 
-- 2 × śruba **M3 × 10** + 2 × nakrętka M3 (płytka enkodera do słupków),
 - podkładki **M10** jako obciążnik (nakładane na dwa słupki, do ok. 13 sztuk na słupek); możesz też przykleić klejem na gorąco inne ciężkie drobiazgi w wolnych miejscach na dnie,
 - nóżki silikonowe albo mata antypoślizgowa na spód (żeby podstawa nie obracała się razem z pokrywą),
 - (opcjonalnie, gdy `set_screw = true`) śruba M3 × 8 + nakrętka M3 do piasty.
 
 ## Składanie
 
-1. **Nakrętki M3** wsuń w boczne kieszenie obu słupków.
-2. **KY-040:** podłącz przewody dupont (zostaw je podłączone). Włóż moduł w **gniazdo na środku podstawy**:
+1. **KY-040:** podłącz przewody dupont (zostaw je podłączone). Włóż moduł w **gniazdo na środku podstawy**:
    płytka leży na czterech podkładkach, między dwiema ściankami, osią do góry, pinami w stronę słupków na podkładki (patrz podgląd).
-3. **Płytkę mocującą** nałóż otworem na tuleję enkodera i przykręć do słupków śrubami M3 × 10.
+2. **Płytkę mocującą** nałóż otworem na tuleję enkodera i **wciśnij na kołki** na słupkach. Nie potrzeba śrub.
    Płytka dociska korpus enkodera od góry, więc moduł nie może się ruszyć. Słupki są celowo o 0,3 mm niższe
-   (`plate_press`), żeby docisk był pewny. Jeśli enkoder i tak ma luz w pionie, podłóż pod płytkę kawałek taśmy
-   albo zmniejsz `enc_body_h`.
+   (`plate_press`), żeby docisk był pewny. Jeśli płytka trzyma się na kołkach za słabo, daj kroplę kleju.
+   Za ciasno? Zwiększ `peg_fit`. Jeśli enkoder ma luz w pionie, podłóż pod płytkę kawałek taśmy albo zmniejsz `enc_body_h`.
+   Wersja na śruby M3: ustaw `plate_fix = "screws"` (kieszenie na nakrętki w słupkach, śruby M3 × 10).
 
    Jeśli Twój enkoder ma gwintowaną tuleję i nakrętkę, ustaw `bushing_threaded = true`, wtedy enkoder przykręca się nakrętką.
-4. **Pico H** odwróć **do góry nogami** (pinami do góry), gniazdem USB w stronę otworu w ściance, i nałóż na cztery kołki.
+3. **Pico H** odwróć **do góry nogami** (pinami do góry), gniazdem USB w stronę otworu w ściance, i nałóż na cztery kołki.
    Podłącz przewody według schematu z głównego README (CLK → pin 4, DT → 5, SW → 6, GND → 3, + → 36).
    Pamiętaj, że po odwróceniu lewa i prawa strona Pico są zamienione. Kieruj się podpisami na spodzie płytki (GP2, GND, 3V3).
-5. Ułóż przewody płasko, nałóż **podkładki** na słupki, przyklej **nóżki** pod spodem.
-6. **Pokrywę** wciśnij na oś enkodera, aż piasta oprze się końcem osi o sufit pokrywy.
+4. Ułóż przewody płasko, nałóż **podkładki** na słupki, przyklej **nóżki** pod spodem.
+5. **Pokrywę** wciśnij na oś enkodera, aż piasta oprze się końcem osi o sufit pokrywy.
    Kliknięcie powinno być wyraźnie wyczuwalne, a pokrywa nie może ocierać o podstawę.
-7. Podłącz kabel micro-USB przez otwór w podstawie.
+6. Podłącz kabel micro-USB przez otwór w podstawie (otwór jest otwarty od dołu, więc wtyczkę wsuwasz od spodu).
 
 Jeśli pokrywa ociera o podstawę, zwiększ `gap`. Jeśli kliknięcie nie działa (pokrywa opiera się, zanim zadziała przycisk),
 sprawdź `shaft_above_bushing`: plik wypisuje „Luz pod piastą”, który powinien wynosić co najmniej 1,5 mm.

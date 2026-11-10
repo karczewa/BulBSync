@@ -17,7 +17,7 @@ part = "assembly";
 D = 86;              // średnica krążka
 wall = 2.4;          // grubość ścianek
 floor_t = 3;         // grubość dna podstawy
-base_h = 12;         // wysokość nieruchomej podstawy (widoczny dolny pas)
+base_h = 13;         // wysokość nieruchomej podstawy (widoczny dolny pas)
 gap = 1.0;           // szczelina między podstawą a pokrywą (większa niż skok przycisku)
 $fn = 120;
 
@@ -37,7 +37,7 @@ bushing_threaded = false;  // true: tuleja z gwintem, enkoder przykręcany nakr�
                            // false: tuleja gładka – płytkę KY-040 trzyma gniazdo w podstawie, a płytka mocująca dociska korpus enkodera
 nut_h = 2;                 // grubość nakrętki (tylko gdy bushing_threaded = true)
 ky_cradle = true;          // ścianki wzdłuż płytki KY-040 – nie pozwalają jej się obracać
-ky_cradle_clear = 1.5;     // luz między płytką KY-040 a ściankami (enkoder nie leży idealnie na środku płytki)
+ky_cradle_clear = 1.0;     // luz między płytką KY-040 a każdą ścianką (sprawdzone na wydruku)
 ky_cradle_wall = 1.6;
 ky_cradle_lip = 1.0;       // o ile ścianki wystają ponad płytkę KY-040
 plate_press = 0.3;         // słupki niższe o tyle, żeby przykręcona płytka mocno docisnęła korpus enkodera
@@ -63,7 +63,10 @@ chamfer = 1.2;
 pico = [51, 21, 1];
 pico_y = 9.5;              // odległość dłuższej krawędzi Pico od osi enkodera
 pico_posts_h = 4;          // wysokość słupków pod Pico (pod nimi mieści się gniazdo USB)
-usb_open = [13, 9];        // otwór na wtyczkę micro-USB (szer., wys.)
+usb_open = [16, 12];       // otwór na wtyczkę micro-USB (szer., wys.) – otwarty od dołu
+pico_post_d = 4.6;         // słupki pod Pico; od strony środka płytki są ścięte (miejsce na gniazdo USB i złącze debug)
+pico_post_keep = 0.8;      // ile słupka zostaje od środka otworu w stronę środka płytki
+pico_peg_d = 1.6;          // kołki w otwory montażowe Pico (otwory mają 2,1 mm)
 dupont_h = 14;             // wysokość wtyczki dupont
 header_h = 2.5;            // plastikowa listwa pinów Pico
 
@@ -73,6 +76,9 @@ washer_post_h = 14;
 washer_pos = [[25, -17], [-25, -17]];
 
 /* [Śruby M3] */
+plate_fix = "pegs";        // "pegs": płytka wciskana na kołki na słupkach (bez śrub); "screws": śruby M3 + nakrętki
+peg_d = 4.0;               // kołki na słupkach
+peg_fit = 0.2;             // otwór w płytce większy o tyle (jak przy otworze na oś: 6,2 na oś 6)
 m3_hole = 3.4;
 m3_tap = 3.0;              // otwór w słupku pod śrubę (przechodzi przez nakrętkę)
 m3_nut_w = 5.5 + 0.4;      // rozmiar klucza nakrętki + luz
@@ -101,6 +107,8 @@ echo(str("Wysokość całkowita: ", cap_top, " mm, średnica: ", D, " mm"));
 echo(str("Luz pod piastą (na wciśnięcie): ", hub_bottom - (plate_z1 + nut_eff), " mm"));
 echo(str("Luz nad przewodami Pico: ", cap_ceiling - dupont_top, " mm"));
 echo(str("Wystająca tuleja ponad płytką: ", bushing_top - plate_z1, " mm"));
+echo(str("Mostek nad otworem USB: ", base_h - (usb_z + usb_open[1] / 2), " mm"));
+assert(base_h - (usb_z + usb_open[1] / 2) >= 1, "Otwór USB za wysoki – za cienki mostek nad nim");
 assert(hub_bottom - (plate_z1 + nut_eff) >= 1.5, "Piasta pokrywy za nisko – za mało miejsca na wciśnięcie gałki");
 assert(hub_bottom > bushing_top + 1.5, "Piasta pokrywy za blisko tulei enkodera – zmniejsz hub_len");
 assert(cap_ceiling - dupont_top >= 1, "Przewody na Pico nie mieszczą się pod pokrywą – zwiększ shaft_above_bushing lub zmniejsz pico_posts_h");
@@ -147,17 +155,25 @@ module base() {
       }
       // słupki pod Pico (z kołkami w otwory montażowe)
       for (p = pico_holes) translate(p) {
-        cylinder(d = 4.6, h = pico_z);
-        cylinder(d = 1.8, h = pico_z + pico[2] + 1.2, $fn = 24);
+        inward = p[1] < pico_y + pico[1] / 2 ? 1 : -1;   // kierunek do środka płytki Pico
+        intersection() {
+          cylinder(d = pico_post_d, h = pico_z, $fn = 32);
+          translate([-pico_post_d, inward > 0 ? -pico_post_d : -pico_post_keep, -1])
+            cube([2 * pico_post_d, pico_post_d + pico_post_keep, pico_z + 2]);
+        }
+        cylinder(d = pico_peg_d, h = pico_z + pico[2] + 1.2, $fn = 24);
       }
+      // kołki na słupkach pod płytkę enkodera
+      if (plate_fix == "pegs") for (sx = [-1, 1])
+        translate([sx * pillar_x, 0, pillar_h - 0.01]) cylinder(d = peg_d, h = plate_t + (plate_z0 - pillar_h) - 0.2, $fn = 32);
       // słupki na podkładki (obciążnik)
       for (p = washer_pos) translate(p) cylinder(d = washer_post_d, h = floor_t + washer_post_h, $fn = 48);
     }
     // otwór na wtyczkę USB w ścianie (Pico leży gniazdem w stronę +X)
-    translate([inner_r - 6, pico_y + pico[1] / 2 - usb_open[0] / 2, usb_z - usb_open[1] / 2])
-      cube([D, usb_open[0], usb_open[1]]);
+    translate([inner_r - 6, pico_y + pico[1] / 2 - usb_open[0] / 2, min(usb_z - usb_open[1] / 2, -1)])
+      cube([D, usb_open[0], usb_z + usb_open[1] / 2 - min(usb_z - usb_open[1] / 2, -1)]);
     // śruby + nakrętki M3 w słupkach
-    for (sx = [-1, 1]) translate([sx * pillar_x, 0, 0]) {
+    if (plate_fix == "screws") for (sx = [-1, 1]) translate([sx * pillar_x, 0, 0]) {
       translate([0, 0, pillar_h - 9]) cylinder(d = m3_tap, h = 10, $fn = 24);
       translate([0, 0, pillar_h - 5]) rotate([0, 0, sx > 0 ? 0 : 180]) hex_nut_slot(m3_nut_w, m3_nut_t, pillar);
     }
@@ -170,7 +186,8 @@ module plate() {
       for (sx = [-1, 1], sy = [-1, 1])
         translate([sx * (pillar_x + pillar / 2 - 2), sy * (plate_w / 2 - 2), 0]) cylinder(r = 2, h = plate_t, $fn = 24);
     translate([0, 0, plate_z0 - 1]) cylinder(d = bushing_d + bushing_clear, h = plate_t + 2, $fn = 48);
-    for (sx = [-1, 1]) translate([sx * pillar_x, 0, plate_z0 - 1]) cylinder(d = m3_hole, h = plate_t + 2, $fn = 24);
+    for (sx = [-1, 1]) translate([sx * pillar_x, 0, plate_z0 - 1])
+      cylinder(d = plate_fix == "pegs" ? peg_d + peg_fit : m3_hole, h = plate_t + 2, $fn = 32);
   }
 }
 
