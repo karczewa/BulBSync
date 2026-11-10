@@ -51,7 +51,7 @@ bushing_clear = 0.4;       // luz otworu na tuleję
 top_t = 3;                 // grubość wierzchu pokrywy
 hub_d = 18;                // średnica piasty na oś
 hub_len = 10;              // jak głęboko piasta nachodzi na oś
-shaft_hole = 6.0;          // otwór na oś Ø6 – pokrywa trzyma się na wcisk; za luźno -> zmniejsz o 0.05–0.1, za ciasno -> zwiększ
+shaft_hole = 6.2;          // otwór na oś (dobrany pierścieniem próbnym nr 1) – pokrywa trzyma się na wcisk; za luźno -> zmniejsz o 0.05–0.1, za ciasno -> zwiększ
 set_screw = false;         // true = śruba dociskowa M3 w piaście + okrągły otwór dostępowy w boku pokrywy
 knurl_n = 72;              // liczba rowków ryflowania
 knurl_depth = 0.7;
