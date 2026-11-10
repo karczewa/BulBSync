@@ -31,7 +31,14 @@ enc_body_h = 6.5;          // wysokość korpusu enkodera nad płytką (do miejs
 bushing_d = 7;             // średnica tulei z gwintem (zwykle M7)
 bushing_h = 7;             // wysokość tulei nad korpusem
 shaft_above_bushing = 12;  // ile osi wystaje ponad tuleję
-nut_h = 2;                 // grubość nakrętki na tulei
+bushing_threaded = false;  // true: tuleja z gwintem, enkoder przykręcany nakrętką do płytki
+                           // false: tuleja gładka – płytkę KY-040 trzyma gniazdo w podstawie, a płytka mocująca dociska korpus enkodera
+nut_h = 2;                 // grubość nakrętki (tylko gdy bushing_threaded = true)
+ky_cradle = true;          // ścianki wzdłuż płytki KY-040 – nie pozwalają jej się obracać
+ky_cradle_clear = 0.4;     // luz między płytką KY-040 a ściankami
+ky_cradle_wall = 1.6;
+ky_cradle_lip = 1.0;       // o ile ścianki wystają ponad płytkę KY-040
+plate_press = 0.3;         // słupki niższe o tyle, żeby przykręcona płytka mocno docisnęła korpus enkodera
 
 /* [Płytka mocująca enkoder] */
 plate_t = 2.5;
@@ -81,19 +88,21 @@ cap_ceiling = shaft_top + 0.5;
 cap_top     = cap_ceiling + top_t;
 cap_bottom  = base_h + gap;
 hub_bottom  = cap_ceiling - hub_len;
+nut_eff     = bushing_threaded ? nut_h : 0;
+pillar_h    = bushing_threaded ? plate_z0 : plate_z0 - plate_press;
 pico_z      = floor_t + pico_posts_h;            // dolna (elementowa) strona Pico
 dupont_top  = pico_z + pico[2] + header_h + dupont_h + 4;   // +4 mm na zagięcie przewodów
 usb_z       = pico_z - 1.4;                       // środek gniazda micro-USB
 inner_r     = D / 2 - wall;
 
 echo(str("Wysokość całkowita: ", cap_top, " mm, średnica: ", D, " mm"));
-echo(str("Luz pod piastą (na wciśnięcie): ", hub_bottom - (plate_z1 + nut_h), " mm"));
+echo(str("Luz pod piastą (na wciśnięcie): ", hub_bottom - (plate_z1 + nut_eff), " mm"));
 echo(str("Luz nad przewodami Pico: ", cap_ceiling - dupont_top, " mm"));
-echo(str("Wystająca tuleja ponad płytką: ", bushing_top - plate_z1, " mm (nakrętka ", nut_h, " mm)"));
-assert(hub_bottom - (plate_z1 + nut_h) >= 1.5, "Piasta pokrywy za nisko – za mało miejsca na wciśnięcie gałki");
+echo(str("Wystająca tuleja ponad płytką: ", bushing_top - plate_z1, " mm"));
+assert(hub_bottom - (plate_z1 + nut_eff) >= 1.5, "Piasta pokrywy za nisko – za mało miejsca na wciśnięcie gałki");
 assert(hub_bottom > bushing_top + 0.5, "Piasta pokrywy dotyka tulei enkodera");
 assert(cap_ceiling - dupont_top >= 1, "Przewody na Pico nie mieszczą się pod pokrywą – zwiększ shaft_above_bushing lub zmniejsz pico_posts_h");
-assert(bushing_top - plate_z1 >= nut_h, "Tuleja za krótka na nakrętkę – zmniejsz plate_t");
+assert(!bushing_threaded || bushing_top - plate_z1 >= nut_h, "Tuleja za krótka na nakrętkę – zmniejsz plate_t");
 
 // ---------------------------------------------------------------------------
 module ring(r_out, r_in, h) {
@@ -124,11 +133,17 @@ module base() {
         translate([0, 0, floor_t]) cylinder(r = inner_r, h = base_h);
       }
       // słupki pod płytkę enkodera
-      for (sx = [-1, 1]) translate([sx * pillar_x - pillar / 2, -pillar / 2, 0]) cube([pillar, pillar, plate_z0]);
+      for (sx = [-1, 1]) translate([sx * pillar_x - pillar / 2, -pillar / 2, 0]) cube([pillar, pillar, pillar_h]);
       // listwy podpierające płytkę KY-040
       if (ky_support) for (sx = [-1, 1])
         translate([sx * ky_support_x - 1, -(ky_pcb[1] - ky_enc_from_edge) + 2, 0])
           cube([2, ky_pcb[1] - 4, ky_bottom]);
+      // gniazdo KY-040: ścianki wzdłuż dłuższych krawędzi (blokują obrót; przesunięcie blokuje tuleja w płytce)
+      if (ky_cradle) for (sx = [-1, 1]) {
+        cx = ky_pcb[0] / 2 + ky_cradle_clear;
+        translate([sx > 0 ? cx : -cx - ky_cradle_wall, -(ky_pcb[1] - ky_enc_from_edge) + 1, 0])
+          cube([ky_cradle_wall, ky_pcb[1] - 1, ky_top + ky_cradle_lip]);
+      }
       // słupki pod Pico (z kołkami w otwory montażowe)
       for (p = pico_holes) translate(p) {
         cylinder(d = 4.6, h = pico_z);
@@ -142,8 +157,8 @@ module base() {
       cube([D, usb_open[0], usb_open[1]]);
     // śruby + nakrętki M3 w słupkach
     for (sx = [-1, 1]) translate([sx * pillar_x, 0, 0]) {
-      translate([0, 0, plate_z0 - 9]) cylinder(d = m3_tap, h = 10, $fn = 24);
-      translate([0, 0, plate_z0 - 5]) rotate([0, 0, sx > 0 ? 0 : 180]) hex_nut_slot(m3_nut_w, m3_nut_t, pillar);
+      translate([0, 0, pillar_h - 9]) cylinder(d = m3_tap, h = 10, $fn = 24);
+      translate([0, 0, pillar_h - 5]) rotate([0, 0, sx > 0 ? 0 : 180]) hex_nut_slot(m3_nut_w, m3_nut_t, pillar);
     }
   }
 }
@@ -192,16 +207,16 @@ module cap() {
   }
 }
 
+// Pierścienie próbne: otwory coraz większe, numer = liczba nacięć na brzegu.
+test_holes = [6.2, 6.35, 6.5, 6.65];
+
 module test_fit() {
-  // płytka z otworem na tuleję (sprawdź: tuleja wchodzi, nakrętka chwyta)
-  difference() {
-    translate([-12, -9, 0]) cube([24, 18, plate_t]);
-    translate([0, 0, -1]) cylinder(d = bushing_d + bushing_clear, h = plate_t + 2, $fn = 48);
-  }
-  // pierścień piasty z otworem na oś (sprawdź: wchodzi z lekkim oporem i trzyma)
-  translate([24, 0, 0]) difference() {
-    cylinder(d = hub_d, h = 8, $fn = 64);
-    translate([0, 0, -1]) cylinder(d = shaft_hole, h = 10, $fn = 48);
+  for (i = [0 : len(test_holes) - 1]) translate([i * 17, 0, 0]) difference() {
+    cylinder(d = 14, h = 6, $fn = 64);
+    translate([0, 0, -1]) cylinder(d = test_holes[i], h = 8, $fn = 48);
+    translate([0, 0, -0.01]) cylinder(d1 = test_holes[i] + 0.8, d2 = test_holes[i], h = 0.4, $fn = 48);
+    // nacięcia: 1, 2, 3 albo 4
+    for (k = [0 : i]) rotate([0, 0, 90 + (k - i / 2) * 14]) translate([7, 0, -1]) cylinder(d = 1.6, h = 8, $fn = 12);
   }
 }
 
@@ -212,7 +227,7 @@ module ky040_mock() {
     translate([-6, -6, ky_top]) cube([12, 12, enc_body_h]);
     translate([0, 0, ky_top + enc_body_h]) cylinder(d = bushing_d, h = bushing_h);
     translate([0, 0, bushing_top]) cylinder(d = 6, h = shaft_above_bushing);
-    translate([0, 0, plate_z1]) cylinder(d = 11, h = nut_h, $fn = 6);
+    if (bushing_threaded) translate([0, 0, plate_z1]) cylinder(d = 11, h = nut_h, $fn = 6);
   }
   color("black") translate([-6.5, -(ky_pcb[1] - ky_enc_from_edge) - 20, ky_bottom - 1]) cube([13, 20, 3.5]);
 }
