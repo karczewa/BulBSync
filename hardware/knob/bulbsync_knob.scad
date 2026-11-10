@@ -18,24 +18,26 @@ D = 86;              // średnica krążka
 wall = 2.4;          // grubość ścianek
 floor_t = 3;         // grubość dna podstawy
 base_h = 12;         // wysokość nieruchomej podstawy (widoczny dolny pas)
-gap = 0.6;           // szczelina między podstawą a pokrywą
+gap = 1.0;           // szczelina między podstawą a pokrywą (większa niż skok przycisku)
 $fn = 120;
 
-/* [KY-040 – zmierz swój moduł!] */
-ky_pcb = [19, 26, 1.6];    // płytka: szerokość, długość, grubość
-ky_enc_from_edge = 8;      // od osi enkodera do krótkiej krawędzi płytki BEZ pinów
-ky_under = 3;              // luz pod płytką (wystające lutowania)
-ky_support = true;         // listwy podpierające płytkę od spodu (przy wciskaniu nacisk idzie na nie)
-ky_support_x = 8.3;        // odległość listew od osi (omijają lutowania nóżek enkodera)
-enc_body_h = 6.5;          // wysokość korpusu enkodera nad płytką (do miejsca, gdzie zaczyna się tuleja)
+/* [KY-040 – wymiary zmierzone dla Okystar KY-040 (HW-040)] */
+ky_pcb = [18.5, 26, 1.6];  // płytka: szerokość, długość, grubość
+ky_enc_from_edge = 9;      // od osi enkodera do krótkiej krawędzi płytki BEZ pinów
+ky_under = 5;              // wysokość podkładek pod płytką (pod spodem są lutowania)
+ky_support = true;         // 4 podkładki pod płytką (przy wciskaniu nacisk idzie na nie)
+ky_pad = 3;                // rozmiar podkładki
+ky_pad_x = 7.45;           // odległość podkładek od osi w poprzek płytki (omijają lutowania)
+ky_pad_y = [7, -12];       // położenie podkładek wzdłuż płytki (z dala od nóżek enkodera i pinów)
+enc_body_h = 5.75;         // wysokość korpusu enkodera nad płytką (do miejsca, gdzie zaczyna się tuleja)
 bushing_d = 7;             // średnica tulei z gwintem (zwykle M7)
 bushing_h = 7;             // wysokość tulei nad korpusem
-shaft_above_bushing = 12;  // ile osi wystaje ponad tuleję
+shaft_above_bushing = 8.6; // ile osi wystaje ponad tuleję
 bushing_threaded = false;  // true: tuleja z gwintem, enkoder przykręcany nakrętką do płytki
                            // false: tuleja gładka – płytkę KY-040 trzyma gniazdo w podstawie, a płytka mocująca dociska korpus enkodera
 nut_h = 2;                 // grubość nakrętki (tylko gdy bushing_threaded = true)
 ky_cradle = true;          // ścianki wzdłuż płytki KY-040 – nie pozwalają jej się obracać
-ky_cradle_clear = 0.4;     // luz między płytką KY-040 a ściankami
+ky_cradle_clear = 1.5;     // luz między płytką KY-040 a ściankami (enkoder nie leży idealnie na środku płytki)
 ky_cradle_wall = 1.6;
 ky_cradle_lip = 1.0;       // o ile ścianki wystają ponad płytkę KY-040
 plate_press = 0.3;         // słupki niższe o tyle, żeby przykręcona płytka mocno docisnęła korpus enkodera
@@ -50,7 +52,7 @@ bushing_clear = 0.4;       // luz otworu na tuleję
 /* [Pokrywa] */
 top_t = 3;                 // grubość wierzchu pokrywy
 hub_d = 18;                // średnica piasty na oś
-hub_len = 10;              // jak głęboko piasta nachodzi na oś
+hub_len = 6.5;             // jak głęboko piasta nachodzi na oś (mniej niż shaft_above_bushing)
 shaft_hole = 6.2;          // otwór na oś (dobrany pierścieniem próbnym nr 1) – pokrywa trzyma się na wcisk; za luźno -> zmniejsz o 0.05–0.1, za ciasno -> zwiększ
 set_screw = false;         // true = śruba dociskowa M3 w piaście + okrągły otwór dostępowy w boku pokrywy
 knurl_n = 72;              // liczba rowków ryflowania
@@ -100,7 +102,7 @@ echo(str("Luz pod piastą (na wciśnięcie): ", hub_bottom - (plate_z1 + nut_eff
 echo(str("Luz nad przewodami Pico: ", cap_ceiling - dupont_top, " mm"));
 echo(str("Wystająca tuleja ponad płytką: ", bushing_top - plate_z1, " mm"));
 assert(hub_bottom - (plate_z1 + nut_eff) >= 1.5, "Piasta pokrywy za nisko – za mało miejsca na wciśnięcie gałki");
-assert(hub_bottom > bushing_top + 0.5, "Piasta pokrywy dotyka tulei enkodera");
+assert(hub_bottom > bushing_top + 1.5, "Piasta pokrywy za blisko tulei enkodera – zmniejsz hub_len");
 assert(cap_ceiling - dupont_top >= 1, "Przewody na Pico nie mieszczą się pod pokrywą – zwiększ shaft_above_bushing lub zmniejsz pico_posts_h");
 assert(!bushing_threaded || bushing_top - plate_z1 >= nut_h, "Tuleja za krótka na nakrętkę – zmniejsz plate_t");
 
@@ -135,9 +137,8 @@ module base() {
       // słupki pod płytkę enkodera
       for (sx = [-1, 1]) translate([sx * pillar_x - pillar / 2, -pillar / 2, 0]) cube([pillar, pillar, pillar_h]);
       // listwy podpierające płytkę KY-040
-      if (ky_support) for (sx = [-1, 1])
-        translate([sx * ky_support_x - 1, -(ky_pcb[1] - ky_enc_from_edge) + 2, 0])
-          cube([2, ky_pcb[1] - 4, ky_bottom]);
+      if (ky_support) for (sx = [-1, 1], py = ky_pad_y)
+        translate([sx * ky_pad_x - ky_pad / 2, py - ky_pad / 2, 0]) cube([ky_pad, ky_pad, ky_bottom]);
       // gniazdo KY-040: ścianki wzdłuż dłuższych krawędzi (blokują obrót; przesunięcie blokuje tuleja w płytce)
       if (ky_cradle) for (sx = [-1, 1]) {
         cx = ky_pcb[0] / 2 + ky_cradle_clear;
