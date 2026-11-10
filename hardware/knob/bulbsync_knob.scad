@@ -67,6 +67,7 @@ usb_open = [16, 12];       // otwór na wtyczkę micro-USB (szer., wys.) – otw
 pico_post_d = 4.6;         // słupki pod Pico; od strony środka płytki są ścięte (miejsce na gniazdo USB i złącze debug)
 pico_post_keep = 0.8;      // ile słupka zostaje od środka otworu w stronę środka płytki
 pico_peg_d = 1.6;          // kołki w otwory montażowe Pico (otwory mają 2,1 mm)
+pico_peg_above = 4;        // ile kołek wystaje ponad płytkę Pico
 dupont_h = 14;             // wysokość wtyczki dupont
 header_h = 2.5;            // plastikowa listwa pinów Pico
 
@@ -79,6 +80,7 @@ washer_pos = [[25, -17], [-25, -17]];
 plate_fix = "pegs";        // "pegs": płytka wciskana na kołki na słupkach (bez śrub); "screws": śruby M3 + nakrętki
 peg_d = 4.0;               // kołki na słupkach
 peg_fit = 0.2;             // otwór w płytce większy o tyle (jak przy otworze na oś: 6,2 na oś 6)
+plate_peg_above = 3;       // ile kołki wystają ponad płytkę mocującą
 m3_hole = 3.4;
 m3_tap = 3.0;              // otwór w słupku pod śrubę (przechodzi przez nakrętkę)
 m3_nut_w = 5.5 + 0.4;      // rozmiar klucza nakrętki + luz
@@ -109,6 +111,8 @@ echo(str("Luz nad przewodami Pico: ", cap_ceiling - dupont_top, " mm"));
 echo(str("Wystająca tuleja ponad płytką: ", bushing_top - plate_z1, " mm"));
 echo(str("Mostek nad otworem USB: ", base_h - (usb_z + usb_open[1] / 2), " mm"));
 assert(base_h - (usb_z + usb_open[1] / 2) >= 1, "Otwór USB za wysoki – za cienki mostek nad nim");
+assert(plate_z1 + plate_peg_above < cap_ceiling - 2, "Kołki płytki enkodera sięgają pokrywy");
+assert(pico_z + pico[2] + pico_peg_above < cap_ceiling - 2, "Kołki Pico sięgają pokrywy");
 assert(hub_bottom - (plate_z1 + nut_eff) >= 1.5, "Piasta pokrywy za nisko – za mało miejsca na wciśnięcie gałki");
 assert(hub_bottom > bushing_top + 1.5, "Piasta pokrywy za blisko tulei enkodera – zmniejsz hub_len");
 assert(cap_ceiling - dupont_top >= 1, "Przewody na Pico nie mieszczą się pod pokrywą – zwiększ shaft_above_bushing lub zmniejsz pico_posts_h");
@@ -161,11 +165,11 @@ module base() {
           translate([-pico_post_d, inward > 0 ? -pico_post_d : -pico_post_keep, -1])
             cube([2 * pico_post_d, pico_post_d + pico_post_keep, pico_z + 2]);
         }
-        cylinder(d = pico_peg_d, h = pico_z + pico[2] + 1.2, $fn = 24);
+        cylinder(d = pico_peg_d, h = pico_z + pico[2] + pico_peg_above, $fn = 24);
       }
       // kołki na słupkach pod płytkę enkodera
       if (plate_fix == "pegs") for (sx = [-1, 1])
-        translate([sx * pillar_x, 0, pillar_h - 0.01]) cylinder(d = peg_d, h = plate_t + (plate_z0 - pillar_h) - 0.2, $fn = 32);
+        translate([sx * pillar_x, 0, pillar_h - 0.01]) cylinder(d = peg_d, h = (plate_z1 - pillar_h) + plate_peg_above, $fn = 32);
       // słupki na podkładki (obciążnik)
       for (p = washer_pos) translate(p) cylinder(d = washer_post_d, h = floor_t + washer_post_h, $fn = 48);
     }
