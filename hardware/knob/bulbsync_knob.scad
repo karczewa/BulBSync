@@ -3,7 +3,8 @@
 // Części (zmienna `part`):
 //   "base"      podstawa (stoi na biurku): Pico, słupki pod płytkę enkodera, słupki na obciążnik, otwór USB
 //   "plate"     płytka, do której przykręca się enkoder (nakrętka na tulei), przykręcana do podstawy
-//   "cap"       obracana pokrywa z ryflowaniem, nasadzana na oś enkodera
+//   "cap"       obrotowy pierścień z ryflowaniem – leży na podstawie
+//   "button"    przycisk na środku – nasadzany na oś enkodera, obraca się razem z pierścieniem
 //   "test"      mały element próbny: otwór na tuleję enkodera + piasta z otworem na oś (drukuj najpierw!)
 //   "assembly"  podgląd całości (nie do druku)
 //   "section"   przekrój całości (nie do druku)
@@ -17,12 +18,11 @@ part = "assembly";
 D = 86;              // średnica krążka
 wall = 2.4;          // grubość ścianek
 floor_t = 3;         // grubość dna podstawy
-base_h = 13;         // wysokość nieruchomej podstawy (widoczny dolny pas)
-gap = 1.0;           // szczelina między podstawą a pokrywą (większa niż skok przycisku)
-cap_guide = true;    // pierścień prowadzący na podstawie, wchodzący w pokrywę – pokrywa się nie kiwa
-guide_clear = 0.35;  // luz między pierścieniem a wnętrzem pokrywy (za ciasno -> zwiększ)
-guide_t = 1.4;       // grubość pierścienia
-guide_h = 4;         // ile pierścień wchodzi w pokrywę
+base_h = 14;         // wysokość nieruchomej podstawy (widoczny dolny pas)
+seam = 0.4;          // widoczna szczelina między podstawą a pierścieniem
+lap_h = 2.5;         // zakładka: górna krawędź podstawy wchodzi w pierścień na tyle
+lap_t = 1.2;         // grubość krawędzi podstawy w zakładce
+lap_clear = 0.3;     // luz promieniowy zakładki (pierścień ociera -> zwiększ; lata na boki -> zmniejsz)
 $fn = 120;
 
 /* [KY-040 – wymiary zmierzone dla Okystar KY-040 (HW-040)] */
@@ -53,12 +53,22 @@ pillar = 8;                // przekrój słupków
 pillar_x = 17;             // odległość słupków od osi
 bushing_clear = 0.4;       // luz otworu na tuleję
 
-/* [Pokrywa] */
-top_t = 3;                 // grubość wierzchu pokrywy
-hub_d = 18;                // średnica piasty na oś
+/* [Pierścień obrotowy i przycisk] */
+// Pierścień leży całym obwodem na podstawie (nie kiwa się) i obraca przycisk przez 3 ukryte wpusty.
+// Przycisk siedzi na osi enkodera: przenosi obrót i kliknięcie.
+top_t = 3.6;               // grubość wierzchu pierścienia i przycisku
+button_d = 40;             // średnica przycisku na środku
+btn_gap = 0.6;             // widoczna szczelina wokół przycisku
+btn_lift = 0.8;            // o ile przycisk może być wyżej, zanim zacznie unosić pierścień (zapas na niedokładny pomiar osi)
+btn_land = 0.6;            // prosty odcinek krawędzi przed stożkiem
+btn_roof = 2.5;            // grubość materiału nad końcem osi
+btn_proud = 0;             // przycisk wyżej (+) lub niżej (-) niż pierścień
+key_n = 3;                 // liczba wpustów przenoszących obrót
+key_deg = 18;              // szerokość kątowa wpustu
+key_clear = 0.6;           // luz boczny wpustu
+hub_d = 14;                // średnica piasty na oś
 hub_len = 6.5;             // jak głęboko piasta nachodzi na oś (mniej niż shaft_above_bushing)
-shaft_hole = 6.2;          // otwór na oś (dobrany pierścieniem próbnym nr 1) – pokrywa trzyma się na wcisk; za luźno -> zmniejsz o 0.05–0.1, za ciasno -> zwiększ
-set_screw = false;         // true = śruba dociskowa M3 w piaście + okrągły otwór dostępowy w boku pokrywy
+shaft_hole = 6.2;          // otwór na oś (dobrany pierścieniem próbnym nr 1); za luźno -> zmniejsz o 0.05–0.1, za ciasno -> zwiększ
 knurl_n = 72;              // liczba rowków ryflowania
 knurl_depth = 0.7;
 chamfer = 1.2;
@@ -98,10 +108,12 @@ plate_z0    = ky_top + enc_body_h;
 plate_z1    = plate_z0 + plate_t;
 bushing_top = ky_top + enc_body_h + bushing_h;
 shaft_top   = bushing_top + shaft_above_bushing;
-cap_ceiling = shaft_top + 0.5;
-cap_top     = cap_ceiling + top_t;
-cap_bottom  = base_h + gap;
-hub_bottom  = cap_ceiling - hub_len;
+button_top  = shaft_top + btn_roof;
+cap_top     = button_top - btn_proud;             // wierzch pierścienia
+cap_ceiling = cap_top - top_t;                    // spód wierzchu pierścienia
+cap_bottom  = base_h - lap_h + seam;
+hub_bottom  = shaft_top - hub_len;
+rb          = button_d / 2;
 nut_eff     = bushing_threaded ? nut_h : 0;
 pillar_h    = bushing_threaded ? plate_z0 : plate_z0 - plate_press;
 pico_z      = floor_t + pico_posts_h;            // dolna (elementowa) strona Pico
@@ -109,7 +121,7 @@ dupont_top  = pico_z + pico[2] + header_h + dupont_h + 4;   // +4 mm na zagięci
 usb_z       = pico_z - 1.4;                       // środek gniazda micro-USB
 inner_r     = D / 2 - wall;
 
-echo(str("Wysokość całkowita: ", cap_top, " mm, średnica: ", D, " mm"));
+echo(str("Wysokość całkowita: ", max(cap_top, button_top), " mm, średnica: ", D, " mm"));
 echo(str("Luz pod piastą (na wciśnięcie): ", hub_bottom - (plate_z1 + nut_eff), " mm"));
 echo(str("Luz nad przewodami Pico: ", cap_ceiling - dupont_top, " mm"));
 echo(str("Wystająca tuleja ponad płytką: ", bushing_top - plate_z1, " mm"));
@@ -117,9 +129,8 @@ echo(str("Mostek nad otworem USB: ", base_h - (usb_z + usb_open[1] / 2), " mm"))
 assert(base_h - (usb_z + usb_open[1] / 2) >= 1, "Otwór USB za wysoki – za cienki mostek nad nim");
 assert(plate_z1 + plate_peg_above < cap_ceiling - 2, "Kołki płytki enkodera sięgają pokrywy");
 assert(pico_z + pico[2] + pico_peg_above < cap_ceiling - 2, "Kołki Pico sięgają pokrywy");
-echo(str("Luz pierścienia prowadzącego: ", guide_clear, " mm, wchodzi w pokrywę na ", guide_h, " mm"));
-assert(hub_bottom - (plate_z1 + nut_eff) >= 1.5, "Piasta pokrywy za nisko – za mało miejsca na wciśnięcie gałki");
-assert(hub_bottom > bushing_top + 1.5, "Piasta pokrywy za blisko tulei enkodera – zmniejsz hub_len");
+assert(hub_bottom - (plate_z1 + nut_eff) >= 1.5, "Piasta przycisku za nisko – za mało miejsca na wciśnięcie");
+assert(hub_bottom > bushing_top + 1.5, "Piasta przycisku za blisko tulei enkodera – zmniejsz hub_len");
 assert(cap_ceiling - dupont_top >= 1, "Przewody na Pico nie mieszczą się pod pokrywą – zwiększ shaft_above_bushing lub zmniejsz pico_posts_h");
 assert(!bushing_threaded || bushing_top - plate_z1 >= nut_h, "Tuleja za krótka na nakrętkę – zmniejsz plate_t");
 
@@ -150,25 +161,6 @@ module base() {
           cylinder(r = D / 2 - chamfer, h = base_h);
         }
         translate([0, 0, floor_t]) cylinder(r = inner_r, h = base_h);
-      }
-      // pierścień prowadzący pokrywę (z fazą od spodu, żeby drukował się bez podpór)
-      if (cap_guide) {
-        g_out = inner_r - guide_clear;
-        g_in = g_out - guide_t;
-        difference() {
-          union() {
-            translate([0, 0, base_h - 0.01]) cylinder(r = g_out, h = guide_h + 0.01);
-            translate([0, 0, base_h - (inner_r - g_in)]) cylinder(r1 = inner_r, r2 = g_in, h = inner_r - g_in);
-            translate([0, 0, base_h - (inner_r - g_in)]) cylinder(r = inner_r, h = inner_r - g_in);
-          }
-          translate([0, 0, base_h - (inner_r - g_in) - 0.01]) cylinder(r1 = inner_r, r2 = g_in, h = inner_r - g_in + 0.02);
-          translate([0, 0, base_h - 0.02]) cylinder(r = g_in, h = guide_h + 1);
-          // fazka na górze ułatwia nałożenie pokrywy
-          translate([0, 0, base_h + guide_h - 0.8]) difference() {
-            cylinder(r = g_out + 1, h = 1);
-            cylinder(r1 = g_out, r2 = g_out - 0.8, h = 0.81);
-          }
-        }
       }
       // słupki pod płytkę enkodera
       for (sx = [-1, 1]) translate([sx * pillar_x - pillar / 2, -pillar / 2, 0]) cube([pillar, pillar, pillar_h]);
@@ -201,6 +193,11 @@ module base() {
     // Zaczyna się tuż za Pico, żeby przeciąć okrągłą ściankę na całej szerokości i zrobić w dnie kanał na wtyczkę.
     translate([pico[0] / 2 + 0.5, pico_y + pico[1] / 2 - usb_open[0] / 2, min(usb_z - usb_open[1] / 2, -1)])
       cube([D, usb_open[0], usb_z + usb_open[1] / 2 - min(usb_z - usb_open[1] / 2, -1)]);
+    // zakładka: górna krawędź podstawy cieńsza od zewnątrz, wchodzi w pierścień
+    translate([0, 0, base_h - lap_h]) difference() {
+      cylinder(r = D, h = lap_h + 1);
+      translate([0, 0, -1]) cylinder(r = inner_r + lap_t, h = lap_h + 3);
+    }
     // śruby + nakrętki M3 w słupkach
     if (plate_fix == "screws") for (sx = [-1, 1]) translate([sx * pillar_x, 0, 0]) {
       translate([0, 0, pillar_h - 9]) cylinder(d = m3_tap, h = 10, $fn = 24);
@@ -220,37 +217,58 @@ module plate() {
   }
 }
 
+module wedge(deg, r, h) {
+  // wycinek koła o kącie `deg`, symetryczny względem osi X
+  linear_extrude(h) polygon(concat([[0, 0]], [for (a = [-deg / 2 : deg / 8 : deg / 2 + 0.001]) [r * cos(a), r * sin(a)]]));
+}
+
+key_deg_notch = key_deg + 2 * atan(key_clear / rb);
+
 module cap() {
+  // Pierścień obrotowy. Wewnętrzny stopień (z = base_h) leży na górnej krawędzi podstawy.
+  hole_r = rb + btn_gap;
+  cone_h = top_t - btn_land;
+  difference() {
+    translate([0, 0, cap_bottom]) hull() {
+      cylinder(r = D / 2, h = cap_top - cap_bottom - chamfer);
+      cylinder(r = D / 2 - chamfer, h = cap_top - cap_bottom);
+    }
+    // wnętrze i zakładka
+    translate([0, 0, base_h]) cylinder(r = inner_r, h = cap_ceiling - base_h);
+    translate([0, 0, cap_bottom - 0.01]) cylinder(r = inner_r + lap_t + lap_clear, h = base_h - cap_bottom + 0.01);
+    // otwór na przycisk: prosty na całej grubości...
+    translate([0, 0, cap_ceiling - 0.01]) cylinder(r = hole_r, h = top_t + 0.02);
+    // ...i stożkowy (szerszy od spodu) wszędzie poza wpustami
+    difference() {
+      translate([0, 0, cap_ceiling - 0.01]) cylinder(r1 = hole_r + cone_h, r2 = hole_r, h = cone_h + 0.01);
+      for (i = [0 : key_n - 1]) rotate([0, 0, i * 360 / key_n]) translate([0, 0, cap_ceiling - 1]) wedge(key_deg, rb + 10, top_t + 2);
+    }
+    // ryflowanie
+    for (i = [0 : knurl_n - 1]) rotate([0, 0, i * 360 / knurl_n])
+      translate([D / 2, 0, base_h + 1]) rotate([0, 0, 45])
+        cube([knurl_depth * sqrt(2), knurl_depth * sqrt(2), cap_top - base_h - 1 - chamfer - 1.5]);
+  }
+}
+
+module button() {
+  // Przycisk: stożek (szerszy od spodu) nie pozwala mu wyjść górą i trzyma pierścień; rowki = gniazda wpustów.
+  d0 = btn_lift + btn_land - btn_gap;      // głębokość, od której zaczyna się stożek
+  z0 = button_top - top_t;
   difference() {
     union() {
+      translate([0, 0, z0]) cylinder(r = rb, h = top_t);
       difference() {
-        translate([0, 0, cap_bottom]) hull() {
-          cylinder(r = D / 2, h = cap_top - cap_bottom - chamfer);
-          cylinder(r = D / 2 - chamfer, h = cap_top - cap_bottom);
+        translate([0, 0, z0]) cylinder(r1 = rb + top_t - d0, r2 = rb, h = top_t - d0);
+        for (i = [0 : key_n - 1]) rotate([0, 0, i * 360 / key_n]) difference() {
+          translate([0, 0, z0 - 1]) wedge(key_deg_notch, rb + 10, top_t + 2);
+          translate([0, 0, z0 - 2]) cylinder(r = rb, h = top_t + 4);
         }
-        translate([0, 0, cap_bottom - 0.01]) cylinder(r = inner_r, h = cap_ceiling - cap_bottom + 0.01);
-        // ryflowanie
-        for (i = [0 : knurl_n - 1]) rotate([0, 0, i * 360 / knurl_n])
-          translate([D / 2, 0, cap_bottom + 2]) rotate([0, 0, 45])
-            cube([knurl_depth * sqrt(2), knurl_depth * sqrt(2), cap_top - cap_bottom - 2 - chamfer - 1.5]);
       }
-      // piasta
-      translate([0, 0, hub_bottom]) cylinder(d = hub_d, h = cap_ceiling - hub_bottom + 0.01, $fn = 64);
+      translate([0, 0, hub_bottom]) cylinder(d = hub_d, h = z0 - hub_bottom + 0.01, $fn = 64);
     }
-    // otwór na oś (nie na wylot)
-    translate([0, 0, hub_bottom - 0.01]) cylinder(d = shaft_hole, h = hub_len, $fn = 48);
-    translate([0, 0, hub_bottom - 0.01]) cylinder(d1 = shaft_hole + 1, d2 = shaft_hole, h = 0.6, $fn = 48);  // fazka wejścia
-    if (set_screw) {
-      sz = hub_bottom + hub_len / 2;
-      // śruba dociskowa: otwór od boku piasty + kieszeń na nakrętkę wsuwaną od dołu
-      translate([0, 0, sz]) rotate([0, 90, 0]) cylinder(d = m3_hole, h = D, $fn = 24);
-      translate([5.6, 0, hub_bottom - 0.01]) hull() {
-        translate([0, 0, 0]) rotate([0, 90, 0]) cylinder(r = m3_nut_w / sqrt(3), h = m3_nut_t, $fn = 6, center = true);
-        translate([0, 0, sz - hub_bottom]) rotate([0, 90, 0]) cylinder(r = m3_nut_w / sqrt(3), h = m3_nut_t, $fn = 6, center = true);
-      }
-      // otwór dostępowy w boku pokrywy (na śrubę i klucz imbusowy / śrubokręt)
-      translate([inner_r - 1, 0, sz]) rotate([0, 90, 0]) cylinder(d = 6.5, h = wall + 2, $fn = 32);
-    }
+    // otwór na oś (nie na wylot) – oś opiera się o jego dno
+    translate([0, 0, hub_bottom - 0.01]) cylinder(d = shaft_hole, h = shaft_top - hub_bottom + 0.01, $fn = 48);
+    translate([0, 0, hub_bottom - 0.01]) cylinder(d1 = shaft_hole + 1, d2 = shaft_hole, h = 0.6, $fn = 48);
   }
 }
 
@@ -288,6 +306,7 @@ module pico_mock() {
 if (part == "base") base();
 else if (part == "plate") translate([0, 0, -plate_z0]) plate();
 else if (part == "cap") translate([0, 0, cap_top]) rotate([180, 0, 0]) cap();   // wierzchem do stołu
+else if (part == "button") translate([0, 0, button_top]) rotate([180, 0, 0]) button();   // wierzchem do stołu
 else if (part == "test") test_fit();
 else if (part == "assembly" || part == "section") {
   difference() {
@@ -295,6 +314,7 @@ else if (part == "assembly" || part == "section") {
       color("dimgray") base();
       color("lightgray") plate();
       color("#3a3a3a", 0.9) cap();
+      color("#555555") button();
       ky040_mock();
       pico_mock();
     }

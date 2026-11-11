@@ -1,41 +1,34 @@
 # Obudowa pokrętła (krążek)
 
-Krążek Ø86 × 34,5 mm na **Raspberry Pi Pico H + moduł KY-040 + przewody dupont**, bez lutowania.
-Kręcisz całą górną pokrywą, a klikasz, wciskając ją.
+Krążek Ø86 × 33,5 mm na **Raspberry Pi Pico H + moduł KY-040 + przewody dupont**, bez lutowania i bez śrub.
+Kręcisz zewnętrznym pierścieniem, klikasz przyciskiem na środku.
 
 ![Rozłożony model](preview_exploded.png)
 ![Strona z kablem USB](preview_usb_side.png)
 
+## Jak to działa
+
+- **Pierścień** leży całym obwodem na górnej krawędzi podstawy (zakładka), więc się nie kiwa.
+- **Przycisk** (Ø40 mm) jest wciśnięty na oś enkodera. Ma stożkową krawędź szerszą od spodu, więc nie wyjdzie górą
+  i przytrzymuje pierścień. Trzy ukryte wpusty w otworze pierścienia obracają przycisk, a z nim oś.
+- Wnętrze podstawy jest od góry całkowicie otwarte, więc Pico wkłada się bez przeszkód.
+
 ## Pliki do druku (`stl/`)
 
-| Plik | Co to | Orientacja | Uwagi |
-|---|---|---|---|
-| `knob_test.stl` | **4 pierścienie próbne** na oś enkodera (numer = liczba nacięć) | jak w pliku | **drukuj najpierw** (ok. 10 min) |
-| `knob_base.stl` | podstawa: dno, ścianka z otworem USB, słupki | dnem do stołu | podpory niepotrzebne |
-| `knob_plate.stl` | płytka, do której przykręca się enkoder | płasko | |
-| `knob_cap.stl` | obracana pokrywa z ryflowaniem | **wierzchem do stołu** (tak jest w pliku) | wierzch wyjdzie gładki od stołu |
+| Plik | Co to | Orientacja |
+|---|---|---|
+| `knob_base.stl` | podstawa: dno, ścianka z otworem USB, słupki, gniazdo enkodera | dnem do stołu |
+| `knob_plate.stl` | płytka dociskająca enkoder, wciskana na kołki | płasko |
+| `knob_cap.stl` | obrotowy pierścień z ryflowaniem | **wierzchem do stołu** (tak jest w pliku) |
+| `knob_button.stl` | przycisk na środek | **wierzchem do stołu** (tak jest w pliku) |
+| `knob_test.stl` | pierścienie próbne do dobrania otworu na oś | jak w pliku |
 
 Sugerowane ustawienia: PLA/PETG, warstwa 0,2 mm, 3 obrysy, wypełnienie 15–20%, bez podpór.
 
-## Najpierw: pierścienie próbne
-
-Nasuwaj pierścienie na oś KY-040 po kolei. Wybierz ten, który wchodzi **z wyraźnym oporem** i nie obraca się na osi:
-
-| Nacięcia | Otwór w modelu | Ustaw `shaft_hole` |
-|---|---|---|
-| 1 | 6,20 mm | 6.2 |
-| 2 | 6,35 mm | 6.35 |
-| 3 | 6,50 mm | 6.5 |
-| 4 | 6,65 mm | 6.65 |
-
-Jeśli jeden jest za ciasny, a następny za luźny, weź wartość pośrodku. Jeśli nawet nr 4 jest za ciasny, zwiększaj dalej.
-Jeśli żaden nie trzyma pewnie, ustaw `set_screw = true`: w piaście będzie śruba dociskowa M3,
-a w boku pokrywy mały okrągły otwór, przez który się ją dokręca.
-
 ## Wymiary KY-040
 
-Model jest ustawiony pod **Okystar KY-040 (HW-040)**, czyli gładką tuleję bez gwintu i nacięty wałek. Inne moduły mogą się różnić,
-więc wtedy zmierz je suwmiarką i popraw sekcję `[KY-040]` na górze pliku `bulbsync_knob.scad`:
+Model jest ustawiony pod **Okystar KY-040 (HW-040)**: gładka tuleja bez gwintu, nacięty wałek. Dla innego modułu
+popraw sekcję `[KY-040]` na górze pliku `bulbsync_knob.scad`:
 
 | Parametr | Okystar KY-040 | Co zmierzyć |
 |---|---|---|
@@ -46,38 +39,36 @@ więc wtedy zmierz je suwmiarką i popraw sekcję `[KY-040]` na górze pliku `bu
 | `shaft_above_bushing` | 8,6 | ile osi wystaje ponad tuleję |
 | `shaft_hole` | 6,2 | otwór na oś, dobrany pierścieniem próbnym nr 1 |
 
-Jeśli coś się różni, zmień liczby w OpenSCAD (darmowy) i wygeneruj STL ponownie:
-**F6** (render), potem **F7** (eksport STL). Wcześniej ustaw na górze pliku `part = "cap";` (albo `"base"`, `"plate"`, `"test"`).
-Plik sam sprawdza, czy po zmianach wszystko się mieści, i wypisuje komunikat w konsoli, gdy coś koliduje.
+Po zmianie liczb w OpenSCAD: ustaw `part = "cap";` (albo `"base"`, `"plate"`, `"button"`), **F6**, potem **F7** (eksport STL).
+Plik sam sprawdza, czy wszystko się mieści.
 
 ## Potrzebne drobiazgi
 
-- podkładki **M10** jako obciążnik (nakładane na dwa słupki, do ok. 13 sztuk na słupek); możesz też przykleić klejem na gorąco inne ciężkie drobiazgi w wolnych miejscach na dnie,
-- nóżki silikonowe albo mata antypoślizgowa na spód (żeby podstawa nie obracała się razem z pokrywą),
-- (opcjonalnie, gdy `set_screw = true`) śruba M3 × 8 + nakrętka M3 do piasty.
+- podkładki **M10** jako obciążnik (na dwa słupki) albo inne ciężkie drobiazgi przyklejone na dnie,
+- nóżki silikonowe albo mata antypoślizgowa na spód (żeby podstawa nie obracała się razem z pierścieniem).
 
 ## Składanie
 
-1. **KY-040:** podłącz przewody dupont (zostaw je podłączone). Włóż moduł w **gniazdo na środku podstawy**:
-   płytka leży na czterech podkładkach, między dwiema ściankami, osią do góry, pinami w stronę słupków na podkładki (patrz podgląd).
-2. **Płytkę mocującą** nałóż otworem na tuleję enkodera i **wciśnij na kołki** na słupkach. Nie potrzeba śrub.
-   Płytka dociska korpus enkodera od góry, więc moduł nie może się ruszyć. Słupki są celowo o 0,3 mm niższe
-   (`plate_press`), żeby docisk był pewny. Jeśli płytka trzyma się na kołkach za słabo, daj kroplę kleju.
-   Za ciasno? Zwiększ `peg_fit`. Jeśli enkoder ma luz w pionie, podłóż pod płytkę kawałek taśmy albo zmniejsz `enc_body_h`.
-   Wersja na śruby M3: ustaw `plate_fix = "screws"` (kieszenie na nakrętki w słupkach, śruby M3 × 10).
+1. **KY-040:** podłącz przewody dupont. Włóż moduł w gniazdo na środku podstawy: płytka na czterech podkładkach,
+   między dwiema ściankami, osią do góry.
+2. **Płytkę mocującą** nałóż otworem na tuleję enkodera i wciśnij na kołki na słupkach.
+3. **Pico H** odwróć do góry nogami (pinami do góry), gniazdem USB w stronę otworu w ściance, i nałóż na cztery kołki.
+   Podłącz przewody według podpisów na spodzie płytki (CLK → GP2, DT → GP3, SW → GP4, GND → GND, + → 3V3).
+4. Ułóż przewody **jak najniżej i z dala od środka**, nałóż podkładki, przyklej nóżki.
+5. **Przycisk włóż w pierścień od spodu** (trzy rowki przycisku trafiają na trzy wpusty w otworze pierścienia).
+6. Nałóż pierścień z przyciskiem na podstawę i **wciśnij środek przycisku na oś** do oporu.
+7. Podłącz kabel micro-USB.
 
-   Jeśli Twój enkoder ma gwintowaną tuleję i nakrętkę, ustaw `bushing_threaded = true`, wtedy enkoder przykręca się nakrętką.
-3. **Pico H** odwróć **do góry nogami** (pinami do góry), gniazdem USB w stronę otworu w ściance, i nałóż na cztery kołki.
-   Podłącz przewody według schematu z głównego README (CLK → pin 4, DT → 5, SW → 6, GND → 3, + → 36).
-   Pamiętaj, że po odwróceniu lewa i prawa strona Pico są zamienione. Kieruj się podpisami na spodzie płytki (GP2, GND, 3V3).
-4. Ułóż przewody płasko, nałóż **podkładki** na słupki, przyklej **nóżki** pod spodem.
-5. **Pokrywę** wciśnij na oś enkodera, aż piasta oprze się końcem osi o sufit pokrywy.
-   Kliknięcie powinno być wyraźnie wyczuwalne, a pokrywa nie może ocierać o podstawę.
-6. Podłącz kabel micro-USB: wtyczka leży w kanale w dnie i wychodzi przez otwór w ściance (otwór jest otwarty od dołu).
+## Dopasowanie
 
-Pokrywę prowadzi pierścień na górze podstawy, więc się nie kiwa. Jeśli obraca się za ciężko, zwiększ `guide_clear`
-(np. 0.5). Jeśli nadal się kiwa, zmniejsz (np. 0.25). Kropla smaru silikonowego albo kawałek taśmy teflonowej
-na pierścieniu sprawi, że będzie się kręcić gładziej.
+| Objaw | Co zmienić |
+|---|---|
+| Pierścień obraca się ciężko albo ociera bokiem | zwiększ `lap_clear` (np. 0.45); pomaga też odrobina smaru albo grafitu z ołówka na krawędzi podstawy |
+| Pierścień ma luz na boki | zmniejsz `lap_clear` (np. 0.2) |
+| Przycisk wystaje ponad pierścień albo unosi pierścień | zmniejsz `btn_roof` o tyle, ile wystaje |
+| Przycisk jest wyraźnie niżej niż pierścień | zwiększ `btn_roof` |
+| Przycisk ociera o otwór | zwiększ `btn_gap` |
+| Przycisk za luźny lub za ciasny na osi | `shaft_hole` (±0,05–0,1) |
 
-Jeśli pokrywa ociera o podstawę, zwiększ `gap`. Jeśli kliknięcie nie działa (pokrywa opiera się, zanim zadziała przycisk),
-sprawdź `shaft_above_bushing`: plik wypisuje „Luz pod piastą”, który powinien wynosić co najmniej 1,5 mm.
+Opcje: `plate_fix = "screws"` (płytka na śruby M3 zamiast kołków), `bushing_threaded = true` (enkoder z gwintem i nakrętką),
+`button_d` (średnica przycisku).

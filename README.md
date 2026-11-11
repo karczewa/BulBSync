@@ -55,7 +55,7 @@ python -m bulbsync
 ## Pokrętło USB (opcjonalne)
 
 Fizyczne pokrętło: kręcenie zmienia jasność, kliknięcie włącza i wyłącza światło.
-Obudowa do druku 3D (krążek z obracaną pokrywą): [`hardware/knob/`](hardware/knob/README.md).
+Obudowa do druku 3D (krążek z obrotowym pierścieniem i przyciskiem na środku): [`hardware/knob/`](hardware/knob/README.md).
 Części: **Raspberry Pi Pico H**, moduł enkodera **KY-040**, 5 przewodów żeńsko-żeńskich, kabel micro-USB **z transmisją danych**.
 
 ### Podłączenie
