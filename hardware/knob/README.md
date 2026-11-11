@@ -73,7 +73,11 @@ Plik sam sprawdza, czy po zmianach wszystko się mieści, i wypisuje komunikat w
 4. Ułóż przewody płasko, nałóż **podkładki** na słupki, przyklej **nóżki** pod spodem.
 5. **Pokrywę** wciśnij na oś enkodera, aż piasta oprze się końcem osi o sufit pokrywy.
    Kliknięcie powinno być wyraźnie wyczuwalne, a pokrywa nie może ocierać o podstawę.
-6. Podłącz kabel micro-USB przez otwór w podstawie (otwór jest otwarty od dołu, więc wtyczkę wsuwasz od spodu).
+6. Podłącz kabel micro-USB: wtyczka leży w kanale w dnie i wychodzi przez otwór w ściance (otwór jest otwarty od dołu).
+
+Pokrywę prowadzi pierścień na górze podstawy, więc się nie kiwa. Jeśli obraca się za ciężko, zwiększ `guide_clear`
+(np. 0.5). Jeśli nadal się kiwa, zmniejsz (np. 0.25). Kropla smaru silikonowego albo kawałek taśmy teflonowej
+na pierścieniu sprawi, że będzie się kręcić gładziej.
 
 Jeśli pokrywa ociera o podstawę, zwiększ `gap`. Jeśli kliknięcie nie działa (pokrywa opiera się, zanim zadziała przycisk),
 sprawdź `shaft_above_bushing`: plik wypisuje „Luz pod piastą”, który powinien wynosić co najmniej 1,5 mm.

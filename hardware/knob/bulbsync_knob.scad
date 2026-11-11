@@ -19,6 +19,10 @@ wall = 2.4;          // grubość ścianek
 floor_t = 3;         // grubość dna podstawy
 base_h = 13;         // wysokość nieruchomej podstawy (widoczny dolny pas)
 gap = 1.0;           // szczelina między podstawą a pokrywą (większa niż skok przycisku)
+cap_guide = true;    // pierścień prowadzący na podstawie, wchodzący w pokrywę – pokrywa się nie kiwa
+guide_clear = 0.35;  // luz między pierścieniem a wnętrzem pokrywy (za ciasno -> zwiększ)
+guide_t = 1.4;       // grubość pierścienia
+guide_h = 4;         // ile pierścień wchodzi w pokrywę
 $fn = 120;
 
 /* [KY-040 – wymiary zmierzone dla Okystar KY-040 (HW-040)] */
@@ -113,6 +117,7 @@ echo(str("Mostek nad otworem USB: ", base_h - (usb_z + usb_open[1] / 2), " mm"))
 assert(base_h - (usb_z + usb_open[1] / 2) >= 1, "Otwór USB za wysoki – za cienki mostek nad nim");
 assert(plate_z1 + plate_peg_above < cap_ceiling - 2, "Kołki płytki enkodera sięgają pokrywy");
 assert(pico_z + pico[2] + pico_peg_above < cap_ceiling - 2, "Kołki Pico sięgają pokrywy");
+echo(str("Luz pierścienia prowadzącego: ", guide_clear, " mm, wchodzi w pokrywę na ", guide_h, " mm"));
 assert(hub_bottom - (plate_z1 + nut_eff) >= 1.5, "Piasta pokrywy za nisko – za mało miejsca na wciśnięcie gałki");
 assert(hub_bottom > bushing_top + 1.5, "Piasta pokrywy za blisko tulei enkodera – zmniejsz hub_len");
 assert(cap_ceiling - dupont_top >= 1, "Przewody na Pico nie mieszczą się pod pokrywą – zwiększ shaft_above_bushing lub zmniejsz pico_posts_h");
@@ -146,6 +151,25 @@ module base() {
         }
         translate([0, 0, floor_t]) cylinder(r = inner_r, h = base_h);
       }
+      // pierścień prowadzący pokrywę (z fazą od spodu, żeby drukował się bez podpór)
+      if (cap_guide) {
+        g_out = inner_r - guide_clear;
+        g_in = g_out - guide_t;
+        difference() {
+          union() {
+            translate([0, 0, base_h - 0.01]) cylinder(r = g_out, h = guide_h + 0.01);
+            translate([0, 0, base_h - (inner_r - g_in)]) cylinder(r1 = inner_r, r2 = g_in, h = inner_r - g_in);
+            translate([0, 0, base_h - (inner_r - g_in)]) cylinder(r = inner_r, h = inner_r - g_in);
+          }
+          translate([0, 0, base_h - (inner_r - g_in) - 0.01]) cylinder(r1 = inner_r, r2 = g_in, h = inner_r - g_in + 0.02);
+          translate([0, 0, base_h - 0.02]) cylinder(r = g_in, h = guide_h + 1);
+          // fazka na górze ułatwia nałożenie pokrywy
+          translate([0, 0, base_h + guide_h - 0.8]) difference() {
+            cylinder(r = g_out + 1, h = 1);
+            cylinder(r1 = g_out, r2 = g_out - 0.8, h = 0.81);
+          }
+        }
+      }
       // słupki pod płytkę enkodera
       for (sx = [-1, 1]) translate([sx * pillar_x - pillar / 2, -pillar / 2, 0]) cube([pillar, pillar, pillar_h]);
       // listwy podpierające płytkę KY-040
@@ -173,8 +197,9 @@ module base() {
       // słupki na podkładki (obciążnik)
       for (p = washer_pos) translate(p) cylinder(d = washer_post_d, h = floor_t + washer_post_h, $fn = 48);
     }
-    // otwór na wtyczkę USB w ścianie (Pico leży gniazdem w stronę +X)
-    translate([inner_r - 6, pico_y + pico[1] / 2 - usb_open[0] / 2, min(usb_z - usb_open[1] / 2, -1)])
+    // otwór na wtyczkę USB: od końca Pico przez dno i ściankę (Pico leży gniazdem w stronę +X).
+    // Zaczyna się tuż za Pico, żeby przeciąć okrągłą ściankę na całej szerokości i zrobić w dnie kanał na wtyczkę.
+    translate([pico[0] / 2 + 0.5, pico_y + pico[1] / 2 - usb_open[0] / 2, min(usb_z - usb_open[1] / 2, -1)])
       cube([D, usb_open[0], usb_z + usb_open[1] / 2 - min(usb_z - usb_open[1] / 2, -1)]);
     // śruby + nakrętki M3 w słupkach
     if (plate_fix == "screws") for (sx = [-1, 1]) translate([sx * pillar_x, 0, 0]) {
